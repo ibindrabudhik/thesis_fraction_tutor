@@ -353,6 +353,5 @@ If you use this work, please cite:
 1. **Activate environment**: `conda activate thesis_rag`
 2. **Navigate to app**: `cd app`
 3. **Run**: `streamlit run main.py`
-4. **Login with**: YPSSTUDENT_1 / test123
 
 **Note**: Make sure database is set up and `.env` is configured first!
