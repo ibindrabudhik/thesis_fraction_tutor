@@ -1,0 +1,10 @@
+streamlit
+openai
+supabase
+python-dotenv
+langchain
+langchain-community
+langchain-openai
+numpy
+sentence-transformers
+faiss-cpu
