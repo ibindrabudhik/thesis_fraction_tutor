@@ -25,14 +25,7 @@ def render_latex(text: str) -> str:
     """Process text to ensure all LaTeX expressions are properly wrapped in $ delimiters.
     
     Handles cases where the LLM outputs bare LaTeX commands without $ wrapping,
-    e.g. \\frac{1}{2} instead of $\\frac{1}{2}$.
-    
-    Strategy:
-    1. Protect already-delimited blocks ($$...$$ and $...$).
-    2. Find any bare LaTeX expression (starting with \\ and optionally followed
-       by braced groups) and wrap it in $ delimiters.
-    3. Merge adjacent $ delimiters that result from wrapping neighbouring expressions.
-    4. Restore protected blocks.
+    e.g. \frac{1}{2} instead of $\frac{1}{2}$.
     """
     if not text:
         return text
@@ -46,75 +39,34 @@ def render_latex(text: str) -> str:
         placeholders.append(match.group(0))
         return f"\x00LATEX{len(placeholders) - 1}\x00"
     
-    # Also protect \\( ... \\) and \\[ ... \\] delimited blocks
-    text = re.sub(r'\$\$[\s\S]+?\$\$', _placeholder, text)
-    text = re.sub(r'\$[^$\n]+?\$', _placeholder, text)
-    text = re.sub(r'\\\([\s\S]+?\\\)', _placeholder, text)
-    text = re.sub(r'\\\[[\s\S]+?\\\]', _placeholder, text)
+    # Protect $$...$$ blocks first, then $...$ blocks
+    text = re.sub(r'\$\$[^$]+?\$\$', _placeholder, text)
+    text = re.sub(r'\$[^$]+?\$', _placeholder, text)
     
-    # Step 2: Helper to match balanced braces  {…}
-    def _match_braced(s, pos):
-        """Return the end index (exclusive) of a balanced {...} starting at pos, or None."""
-        if pos >= len(s) or s[pos] != '{':
-            return None
-        depth = 0
-        i = pos
-        while i < len(s):
-            if s[i] == '{':
-                depth += 1
-            elif s[i] == '}':
-                depth -= 1
-                if depth == 0:
-                    return i + 1
-            i += 1
-        return None  # unbalanced
+    # Step 2: Wrap bare \frac{...}{...} (including with optional leading number like 3\frac{1}{2})
+    text = re.sub(
+        r'(\d*)\\frac\{([^}]*)\}\{([^}]*)\}',
+        r'$\1\\frac{\2}{\3}$',
+        text
+    )
     
-    # Step 3: Scan for bare LaTeX commands and wrap them.
-    # Match an optional leading digit(s) followed by a backslash-command,
-    # then consume any {…} groups that follow immediately.
-    # This handles:  \frac{a}{b},  3\frac{1}{2},  \sqrt{x},  \times,  \leq, etc.
-    result = []
-    i = 0
-    while i < len(text):
-        # Check for placeholder – skip over it
-        if text[i] == '\x00' and text[i:i+5] == '\x00LATE':
-            end = text.index('\x00', i + 1) + 1
-            result.append(text[i:end])
-            i = end
-            continue
-        
-        # Check for optional leading digits + backslash command
-        # e.g. "3\frac{1}{2}"  or  "\frac{1}{2}"  or  "\times"
-        m = re.match(r'(\d*)(\\[a-zA-Z]+)', text[i:])
-        if m:
-            start = i
-            digits = m.group(1)
-            cmd = m.group(2)
-            j = i + len(m.group(0))
-            
-            # Consume any following {…} groups
-            while j < len(text):
-                end_brace = _match_braced(text, j)
-                if end_brace is not None:
-                    j = end_brace
-                else:
-                    break
-            
-            bare_expr = text[start:j]
-            result.append(f'${bare_expr}$')
-            i = j
-        else:
-            result.append(text[i])
-            i += 1
-    
-    text = ''.join(result)
+    # Step 3: Wrap bare LaTeX operators that are not inside $ delimiters
+    bare_operators = [
+        (r'\\times', r'$\\times$'),
+        (r'\\div', r'$\\div$'),
+        (r'\\pm', r'$\\pm$'),
+        (r'\\cdot', r'$\\cdot$'),
+        (r'\\sqrt\{([^}]*)\}', r'$\\sqrt{\1}$'),
+    ]
+    for pattern, replacement in bare_operators:
+        text = re.sub(pattern, replacement, text)
     
     # Step 4: Merge adjacent $ delimiters: "$a$ $b$" → "$a \; b$" and "$x$$y$" → "$x y$"
     text = re.sub(r'\$\s*\$', ' ', text)
     
     # Step 5: Restore protected blocks
-    for idx, original in enumerate(placeholders):
-        text = text.replace(f"\x00LATEX{idx}\x00", original)
+    for i, original in enumerate(placeholders):
+        text = text.replace(f"\x00LATEX{i}\x00", original)
     
     return text
 
@@ -206,31 +158,18 @@ def get_random_task_by_knowledge_area(knowledge_areas: list, level: str = None) 
         if not response.data:
             return None
         
-        # Filter tasks: a task is eligible only if ALL of its knowledge areas
-        # are currently active in the schedule. This ensures multi-area tasks
-        # (e.g., addition + subtraction) only appear when both areas are scheduled.
-        all_knowledge_area_columns = [
-            "knowledge_area_ordering",
-            "knowledge_area_addition",
-            "knowledge_area_subtraction",
-            "knowledge_area_multiplication",
-            "knowledge_area_division",
-        ]
-        active_columns = {f"knowledge_area_{area}" for area in knowledge_areas}
-        
+        # Filter tasks: ALL of a task's knowledge areas must be currently active.
+        # This ensures multi-knowledge-area tasks only appear when all their areas are scheduled.
+        all_area_names = ["ordering", "addition", "subtraction", "multiplication", "division"]
         matching_tasks = []
         for task in response.data:
-            # Collect all knowledge areas this task belongs to
-            task_areas = {
-                col for col in all_knowledge_area_columns
-                if task.get(col, False)
-            }
-            
-            if not task_areas:
-                continue  # Skip tasks with no knowledge area
-            
-            # Task is eligible only if ALL its knowledge areas are currently active
-            if task_areas.issubset(active_columns):
+            # Collect which knowledge areas this task requires
+            task_areas = [
+                area for area in all_area_names
+                if task.get(f"knowledge_area_{area}", False)
+            ]
+            # Task must have at least one area, and ALL its areas must be active
+            if task_areas and all(area in knowledge_areas for area in task_areas):
                 matching_tasks.append(task)
         
         if not matching_tasks:
@@ -374,8 +313,6 @@ def _start_new_session():
             st.session_state.error_count = 0
             st.session_state.session_complete = False
             st.session_state.previous_feedbacks = []  # Reset feedback history
-            st.session_state.cheat_count = 0  # Reset cheat count for new problem
-            st.session_state.cheat_reset_count += 1  # Signal JS to reset counter
             
             # Pre-fetch problem context for faster first response
             prefetch_problem_context(task["question"], top_k=5)
@@ -410,8 +347,6 @@ if "previous_feedbacks" not in st.session_state:
     st.session_state.previous_feedbacks = []
 if "cheat_count" not in st.session_state:
     st.session_state.cheat_count = 0
-if "cheat_reset_count" not in st.session_state:
-    st.session_state.cheat_reset_count = 0
 if "current_session_id" not in st.session_state:
     student_id = get_student_id()
     current_task = _fetch_current_problem()
@@ -421,7 +356,7 @@ if "current_session_id" not in st.session_state:
 
 # Render tab detector (installs JS listeners on parent window)
 # The component returns the cheat count directly via bidirectional communication
-detected_switches = render_tab_detector(reset_count=st.session_state.cheat_reset_count)
+detected_switches = render_tab_detector()
 if detected_switches > st.session_state.cheat_count:
     st.session_state.cheat_count = detected_switches
 
@@ -675,9 +610,8 @@ with col2:
                     # Keep only last 2
                     st.session_state.previous_feedbacks = st.session_state.previous_feedbacks[:2]
                     
-                    # Rerun to update button state immediately if session complete
-                    # Append assistant_turn to chat_history BEFORE rerun so the
-                    # final feedback is persisted and rendered on the next run.
+                    # Persist the final feedback in chat history BEFORE rerun
+                    # so it is displayed after the page reloads
                     if is_final:
                         st.session_state.chat_history.append(assistant_turn)
                         st.rerun()

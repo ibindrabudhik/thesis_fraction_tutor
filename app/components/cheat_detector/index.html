@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+
+        @keyframes cheatSlideDown {
+            from { transform: translateX(-50%) translateY(-120px); opacity: 0; }
+            to   { transform: translateX(-50%) translateY(0);      opacity: 1; }
+        }
+        @keyframes cheatFadeOut {
+            from { opacity: 1; }
+            to   { opacity: 0; }
+        }
+
+        #cheat-warning-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(255, 0, 0, 0.15);
+            z-index: 99998;
+            pointer-events: none;
+            animation: cheatFadeOut 2.5s forwards;
+        }
+
+        #cheat-warning-banner {
+            position: fixed; top: 24px; left: 50%;
+            transform: translateX(-50%);
+            background: #ff4b4b; color: #fff;
+            padding: 18px 44px; border-radius: 14px;
+            font-size: 18px; font-weight: 700;
+            z-index: 99999;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            animation: cheatSlideDown 0.35s ease-out;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+<script>
+(function () {
+    /* --------------------------------------------------------
+       Streamlit component messaging helpers (raw protocol)
+       -------------------------------------------------------- */
+    function sendMsg(type, data) {
+        window.parent.postMessage(
+            Object.assign({ isStreamlitMessage: true, type: type }, data),
+            "*"
+        );
+    }
+
+    function setComponentValue(val) {
+        sendMsg("streamlit:setComponentValue", { value: val });
+    }
+
+    function setFrameHeight(h) {
+        sendMsg("streamlit:setFrameHeight", { height: h });
+    }
+
+    function componentReady() {
+        sendMsg("streamlit:componentReady", { apiVersion: 1 });
+    }
+
+    /* --------------------------------------------------------
+       References to the PARENT page (the Streamlit app)
+       -------------------------------------------------------- */
+    var parentDoc, parentWin;
+    try {
+        parentDoc = window.parent.document;
+        parentWin = window.parent;
+    } catch (e) {
+        // Cross-origin – fall back to own document/window
+        parentDoc = document;
+        parentWin = window;
+    }
+
+    /* --------------------------------------------------------
+       State
+       -------------------------------------------------------- */
+    // Persist count across Streamlit reruns via the parent window
+    if (typeof parentWin.__cheatSwitchCount === "undefined") {
+        parentWin.__cheatSwitchCount = 0;
+    }
+
+    /* --------------------------------------------------------
+       Warning popup – injected into the PARENT page
+       -------------------------------------------------------- */
+
+    // Inject the CSS into the parent page (once)
+    if (!parentWin.__cheatCSSInjected) {
+        parentWin.__cheatCSSInjected = true;
+        var style = parentDoc.createElement("style");
+        style.textContent =
+            "@keyframes cheatSlideDown2{from{transform:translateX(-50%) translateY(-120px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}" +
+            "@keyframes cheatFadeOut2{from{opacity:1}to{opacity:0}}" +
+            ".cheat-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,0,0,0.15);z-index:99998;pointer-events:none;animation:cheatFadeOut2 2.5s forwards}" +
+            ".cheat-banner{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#ff4b4b;color:#fff;padding:18px 44px;border-radius:14px;font-size:18px;font-weight:700;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.35);animation:cheatSlideDown2 .35s ease-out;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;white-space:nowrap}";
+        parentDoc.head.appendChild(style);
+    }
+
+    function showWarningOnParent() {
+        // Remove existing
+        var el;
+        el = parentDoc.getElementById("cheat-overlay"); if (el) el.remove();
+        el = parentDoc.getElementById("cheat-banner");  if (el) el.remove();
+
+        var overlay = parentDoc.createElement("div");
+        overlay.id = "cheat-overlay";
+        overlay.className = "cheat-overlay";
+        parentDoc.body.appendChild(overlay);
+
+        var banner = parentDoc.createElement("div");
+        banner.id = "cheat-banner";
+        banner.className = "cheat-banner";
+        banner.textContent = "\u26A0\uFE0F  Terdeteksi berpindah tab/window! Kerjakan sendiri ya! \uD83D\uDCDA";
+        parentDoc.body.appendChild(banner);
+
+        setTimeout(function () {
+            var o = parentDoc.getElementById("cheat-overlay");
+            var b = parentDoc.getElementById("cheat-banner");
+            if (o) o.remove();
+            if (b) b.remove();
+        }, 3500);
+    }
+
+    /* --------------------------------------------------------
+       Event listeners – installed on the PARENT window once
+       -------------------------------------------------------- */
+    if (!parentWin.__cheatListenersInstalled) {
+        parentWin.__cheatListenersInstalled = true;
+
+        parentDoc.addEventListener("visibilitychange", function () {
+            if (parentDoc.hidden) {
+                parentWin.__cheatSwitchCount++;
+            } else if (parentWin.__cheatSwitchCount > 0) {
+                showWarningOnParent();
+            }
+        });
+
+        parentWin.addEventListener("blur", function () {
+            parentWin.__cheatSwitchCount++;
+        });
+
+        parentWin.addEventListener("focus", function () {
+            if (parentWin.__cheatSwitchCount > 0) {
+                showWarningOnParent();
+            }
+        });
+    }
+
+    /* --------------------------------------------------------
+       Track reset_count from Python to reset the counter
+       when the student moves to the next problem.
+       -------------------------------------------------------- */
+    if (typeof parentWin.__cheatResetCount === "undefined") {
+        parentWin.__cheatResetCount = 0;
+    }
+
+    /* --------------------------------------------------------
+       Listen for Streamlit render events so we can push the
+       current count back to Python on every re-render.
+       -------------------------------------------------------- */
+    window.addEventListener("message", function (event) {
+        if (event.data && event.data.type === "streamlit:render") {
+            // Check if Python requests a counter reset
+            var args = event.data.args || {};
+            var resetCount = args.reset_count || 0;
+            if (resetCount > parentWin.__cheatResetCount) {
+                parentWin.__cheatResetCount = resetCount;
+                parentWin.__cheatSwitchCount = 0;
+            }
+            // Every time Streamlit re-renders this component,
+            // send the latest count back.
+            setComponentValue(parentWin.__cheatSwitchCount);
+        }
+    });
+
+    /* --------------------------------------------------------
+       Boot
+       -------------------------------------------------------- */
+    componentReady();
+    setFrameHeight(0);
+    // Send the initial count
+    setComponentValue(parentWin.__cheatSwitchCount);
+})();
+</script>
+</body>
+</html>
