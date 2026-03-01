@@ -86,17 +86,17 @@ require_authentication()
 # Define when each knowledge area is accessible
 KNOWLEDGE_AREA_SCHEDULE = {
     "ordering": {
-        "start": datetime(2026, 3, 2, 0, 0),
+        "start": datetime(2026, 3, 1, 0, 0),
         "end": datetime(2026, 3, 15, 23, 59),
         "label": "Mengurutkan Pecahan"
     },
     "addition": {
-        "start": datetime(2026, 3, 2, 0, 0),
+        "start": datetime(2026, 3, 1, 0, 0),
         "end": datetime(2026, 3, 15, 23, 59),
         "label": "Penjumlahan Pecahan"
     },
     "subtraction": {
-        "start": datetime(2026, 3, 2, 0, 0),
+        "start": datetime(2026, 3, 1, 0, 0),
         "end": datetime(2026, 3, 15, 23, 59),
         "label": "Pengurangan Pecahan"
     },
