@@ -80,6 +80,27 @@
     if (typeof parentWin.__cheatSwitchCount === "undefined") {
         parentWin.__cheatSwitchCount = 0;
     }
+    // Latch to avoid double counting the same leave event
+    if (typeof parentWin.__cheatAwayActive === "undefined") {
+        parentWin.__cheatAwayActive = false;
+    }
+
+    /* --------------------------------------------------------
+       CRITICAL: Store setComponentValue on parentWin so that
+       event listeners (which persist across iframe recreations)
+       always call the LATEST iframe's function.
+       Each time Streamlit reruns, a new iframe is created with
+       a new setComponentValue. The old one becomes a dead ref.
+       -------------------------------------------------------- */
+    parentWin.__cheatSetValue = setComponentValue;
+
+    // Helper to push counts using the freshest iframe's callback
+    function pushCheatCount(val) {
+        var fn = parentWin.__cheatSetValue || setComponentValue;
+        if (fn) {
+            fn(val);
+        }
+    }
 
     /* --------------------------------------------------------
        Warning popup – injected into the PARENT page
@@ -90,10 +111,10 @@
         parentWin.__cheatCSSInjected = true;
         var style = parentDoc.createElement("style");
         style.textContent =
-            "@keyframes cheatSlideDown2{from{transform:translateX(-50%) translateY(-120px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}" +
+            "@keyframes cheatPopIn{from{transform:translate(-50%,-50%) scale(0.7);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}" +
             "@keyframes cheatFadeOut2{from{opacity:1}to{opacity:0}}" +
             ".cheat-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,0,0,0.15);z-index:99998;pointer-events:none;animation:cheatFadeOut2 2.5s forwards}" +
-            ".cheat-banner{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#ff4b4b;color:#fff;padding:18px 44px;border-radius:14px;font-size:18px;font-weight:700;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.35);animation:cheatSlideDown2 .35s ease-out;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;white-space:nowrap}";
+            ".cheat-banner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#ff4b4b;color:#fff;padding:24px 52px;border-radius:16px;font-size:20px;font-weight:700;z-index:99999;box-shadow:0 12px 40px rgba(0,0,0,0.45);animation:cheatPopIn .3s cubic-bezier(.34,1.56,.64,1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;white-space:nowrap;text-align:center}";
         parentDoc.head.appendChild(style);
     }
 
@@ -122,30 +143,79 @@
         }, 3500);
     }
 
-    /* --------------------------------------------------------
-       Event listeners – installed on the PARENT window once
-       -------------------------------------------------------- */
-    if (!parentWin.__cheatListenersInstalled) {
-        parentWin.__cheatListenersInstalled = true;
-
-        parentDoc.addEventListener("visibilitychange", function () {
-            if (parentDoc.hidden) {
-                parentWin.__cheatSwitchCount++;
-            } else if (parentWin.__cheatSwitchCount > 0) {
-                showWarningOnParent();
-            }
-        });
-
-        parentWin.addEventListener("blur", function () {
-            parentWin.__cheatSwitchCount++;
-        });
-
-        parentWin.addEventListener("focus", function () {
-            if (parentWin.__cheatSwitchCount > 0) {
-                showWarningOnParent();
-            }
-        });
+    function registerAway() {
+        // Count only once until user comes back
+        if (parentWin.__cheatAwayActive) return;
+        parentWin.__cheatAwayActive = true;
+        parentWin.__cheatSwitchCount++;
+        pushCheatCount(parentWin.__cheatSwitchCount);
     }
+
+    function registerBack() {
+        if (!parentWin.__cheatAwayActive) return;
+        parentWin.__cheatAwayActive = false;
+        if (parentWin.__cheatSwitchCount > 0) {
+            showWarningOnParent();
+            pushCheatCount(parentWin.__cheatSwitchCount);
+        }
+    }
+
+    /* --------------------------------------------------------
+       Event listeners – installed on the PARENT window once.
+       IMPORTANT: These must call parentWin.__cheatSetValue()
+       instead of the closure-scoped setComponentValue(),
+       because the closure belongs to whichever iframe first
+       installed the listeners. After st.rerun(), that iframe
+       is destroyed and its setComponentValue becomes a dead
+       reference. parentWin.__cheatSetValue is updated by
+       every new iframe so it always points to the live one.
+       -------------------------------------------------------- */
+    // Re-bind listeners on every iframe run in an idempotent way:
+    // remove old handlers first (if any), then attach fresh ones.
+    // This avoids stale/broken listeners across reruns and prevents duplicates.
+    if (parentWin.__cheatOnVisibilityChange) {
+        parentDoc.removeEventListener("visibilitychange", parentWin.__cheatOnVisibilityChange);
+    }
+    if (parentWin.__cheatOnBlur) {
+        parentWin.removeEventListener("blur", parentWin.__cheatOnBlur);
+    }
+    if (parentWin.__cheatOnFocus) {
+        parentWin.removeEventListener("focus", parentWin.__cheatOnFocus);
+    }
+    if (parentWin.__cheatOnPageHide) {
+        parentWin.removeEventListener("pagehide", parentWin.__cheatOnPageHide);
+    }
+
+    parentWin.__cheatOnVisibilityChange = function () {
+        if (parentDoc.hidden) {
+            registerAway();
+        } else {
+            registerBack();
+        }
+    };
+
+    parentWin.__cheatOnBlur = function () {
+        // If focus is lost, consider it a leave event.
+        // Latch prevents double counting with visibilitychange.
+        registerAway();
+    };
+
+    parentWin.__cheatOnFocus = function () {
+        // When focus returns, mark as back.
+        registerBack();
+    };
+
+    parentWin.__cheatOnPageHide = function () {
+        registerAway();
+    };
+
+    // Tab switches are most reliably detected by visibilitychange.
+    parentDoc.addEventListener("visibilitychange", parentWin.__cheatOnVisibilityChange);
+    // Window/app switches sometimes only fire blur/focus.
+    parentWin.addEventListener("blur", parentWin.__cheatOnBlur);
+    parentWin.addEventListener("focus", parentWin.__cheatOnFocus);
+    // Fallback for some browsers when tab is discarded/hidden.
+    parentWin.addEventListener("pagehide", parentWin.__cheatOnPageHide);
 
     /* --------------------------------------------------------
        Track reset_count from Python to reset the counter
@@ -167,10 +237,11 @@
             if (resetCount > parentWin.__cheatResetCount) {
                 parentWin.__cheatResetCount = resetCount;
                 parentWin.__cheatSwitchCount = 0;
+                parentWin.__cheatAwayActive = false;
             }
             // Every time Streamlit re-renders this component,
             // send the latest count back.
-            setComponentValue(parentWin.__cheatSwitchCount);
+            pushCheatCount(parentWin.__cheatSwitchCount);
         }
     });
 
@@ -180,7 +251,7 @@
     componentReady();
     setFrameHeight(0);
     // Send the initial count
-    setComponentValue(parentWin.__cheatSwitchCount);
+    pushCheatCount(parentWin.__cheatSwitchCount);
 })();
 </script>
 </body>

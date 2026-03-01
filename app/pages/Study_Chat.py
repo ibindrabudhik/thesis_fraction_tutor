@@ -32,6 +32,13 @@ def render_latex(text: str) -> str:
     
     import re
     
+    # Step 0: Normalize over-escaped backslashes (\\cmd → \cmd).
+    # LLM sometimes outputs \\frac (double backslash) due to JSON escaping confusion.
+    # A double backslash in the Python string (i.e. the chars \ ) won't match the LaTeX
+    # patterns below, so we normalize first.
+    for _cmd in ('frac', 'times', 'div', 'pm', 'cdot', 'sqrt', 'left', 'right', 'text', 'leq', 'geq', 'neq'):
+        text = text.replace('\\\\' + _cmd, '\\' + _cmd)  # \\cmd → \cmd
+    
     # Step 1: Protect already-delimited LaTeX blocks by replacing them with placeholders
     placeholders = []
     
@@ -79,28 +86,28 @@ require_authentication()
 # Define when each knowledge area is accessible
 KNOWLEDGE_AREA_SCHEDULE = {
     "ordering": {
-        "start": datetime(2026, 2, 20, 0, 0),
-        "end": datetime(2026, 2, 21, 23, 59),
+        "start": datetime(2026, 3, 2, 0, 0),
+        "end": datetime(2026, 3, 15, 23, 59),
         "label": "Mengurutkan Pecahan"
     },
     "addition": {
-        "start": datetime(2026, 2, 22, 0, 0),
-        "end": datetime(2026, 2, 23, 23, 59),
+        "start": datetime(2026, 3, 2, 0, 0),
+        "end": datetime(2026, 3, 15, 23, 59),
         "label": "Penjumlahan Pecahan"
     },
     "subtraction": {
-        "start": datetime(2026, 2, 24, 0, 0),
-        "end": datetime(2026, 2, 25, 23, 59),
+        "start": datetime(2026, 3, 2, 0, 0),
+        "end": datetime(2026, 3, 15, 23, 59),
         "label": "Pengurangan Pecahan"
     },
     "multiplication": {
-        "start": datetime(2026, 2, 26, 0, 0),
-        "end": datetime(2026, 2, 27, 23, 59),
+        "start": datetime(2026, 3, 5, 0, 0),
+        "end": datetime(2026, 3, 15, 23, 59),
         "label": "Perkalian Pecahan"
     },
     "division": {
-        "start": datetime(2026, 2, 28, 0, 0),
-        "end": datetime(2026, 3, 1, 23, 59),
+        "start": datetime(2026, 3, 9, 0, 0),
+        "end": datetime(2026, 3, 15, 23, 59),
         "label": "Pembagian Pecahan"
     }
 }
@@ -313,6 +320,8 @@ def _start_new_session():
             st.session_state.error_count = 0
             st.session_state.session_complete = False
             st.session_state.previous_feedbacks = []  # Reset feedback history
+            st.session_state.cheat_count = 0  # Reset cheat count for new session
+            st.session_state.cheat_reset_count += 1  # Signal JS to reset its counter
             
             # Pre-fetch problem context for faster first response
             prefetch_problem_context(task["question"], top_k=5)
@@ -331,7 +340,7 @@ st.title("🤖 Belajar Bareng Uma")
 # Study ethics banner
 st.info("""
 ℹ️ **Panduan Belajar**  
-Kerjakan soal secara **mandiri** tanpa bantuan ChatGPT atau alat lain. Tidak apa-apa membuat kesalahan - Chatbot Uma ini akan membantumu belajar dari segala bentuk kesalahan! **Tidak ada hukuman** untuk salah saat belajar bersama Uma. 📚
+Kerjakan soal secara **mandiri** tanpa bantuan ChatGPT atau alat lain. Kamu akan ketahuan ketika berpindah tab/window. Tidak apa-apa membuat kesalahan - Chatbot Uma ini akan membantumu belajar dari segala bentuk kesalahan! **Tidak ada hukuman** untuk salah saat belajar bersama Uma. 📚
 """)
 
 # Initialize session state
@@ -347,6 +356,10 @@ if "previous_feedbacks" not in st.session_state:
     st.session_state.previous_feedbacks = []
 if "cheat_count" not in st.session_state:
     st.session_state.cheat_count = 0
+if "cheat_reset_count" not in st.session_state:
+    st.session_state.cheat_reset_count = 0
+if "last_processed_reset" not in st.session_state:
+    st.session_state.last_processed_reset = 0
 if "current_session_id" not in st.session_state:
     student_id = get_student_id()
     current_task = _fetch_current_problem()
@@ -356,9 +369,20 @@ if "current_session_id" not in st.session_state:
 
 # Render tab detector (installs JS listeners on parent window)
 # The component returns the cheat count directly via bidirectional communication
-detected_switches = render_tab_detector()
-if detected_switches > st.session_state.cheat_count:
+# Pass cheat_reset_count so JS resets parentWin.__cheatSwitchCount on new session
+detected_switches = render_tab_detector(reset_count=st.session_state.cheat_reset_count)
+
+# Guard against stale component value after a reset.
+# On the first rerun after _start_new_session(), the JS component may not have
+# processed the new reset_count yet and returns the old (non-zero) count.
+# We skip updating cheat_count for that one rerun to prevent it from being
+# immediately overwritten back to the old value.
+if st.session_state.cheat_reset_count > st.session_state.last_processed_reset:
+    # Reset was just signaled — mark it as processed and ignore the stale JS value.
+    st.session_state.last_processed_reset = st.session_state.cheat_reset_count
+elif detected_switches > st.session_state.cheat_count:
     st.session_state.cheat_count = detected_switches
+    st.rerun()  # Immediately re-render to update the warning banner
 
 # Show persistent warning banner if student has switched tabs
 if st.session_state.cheat_count > 0:

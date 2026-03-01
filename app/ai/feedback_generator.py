@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from functools import lru_cache
 from typing import Dict, Sequence
 
@@ -51,7 +52,7 @@ def _read_openai_key() -> str:
     return key
 
 
-@lru_cache(maxsize=1)
+@st.cache_resource
 def _get_openai_client():
     """Create a cached OpenAI client or module configured with the API key."""
     api_key = _read_openai_key()
@@ -71,6 +72,7 @@ def _build_prompt(
     student_current_answer: str,
     number_of_errors: int = 0,
     evaluation_reasoning: str = "",
+    specific_error: str = "",
     previous_feedbacks: list = None,
 ) -> str:
     """Build the feedback generation prompt with all context."""
@@ -81,72 +83,111 @@ def _build_prompt(
     # Build previous feedback section if available
     previous_feedback_section = ""
     if previous_feedbacks:
-        previous_feedback_section = "\n[Previous Feedback History - DO NOT REPEAT THESE]\n"
+        previous_feedback_section = "\n[Previous Attempts & Feedback - YOU MUST NOT REPEAT THESE]\n"
         for i, prev in enumerate(previous_feedbacks, 1):
             previous_feedback_section += f"""
 Attempt {i}:
 - Student Answer: {prev.get('student_answer', 'N/A')}
 - Feedback Type: {prev.get('feedback_type', 'N/A')}
-- Feedback Given: {prev.get('feedback_given', 'N/A')[:500]}...
+- Feedback Given: {prev.get('feedback_given', 'N/A')[:500]}
 """
-        previous_feedback_section += "\nIMPORTANT: Provide NEW insights, different approaches, or alternative explanations. Do NOT repeat the feedback above.\n"
+        previous_feedback_section += "\nCRITICAL: The student has already received the above feedback and STILL made an error. You MUST approach the explanation from a completely different angle.\n"
+
+    # Build feedback type specific instruction
+    feedback_type_instruction = ""
+    if feedback_type == "Response-Contingent":
+        feedback_type_instruction = """
+FEEDBACK TYPE INSTRUCTION (Response-Contingent):
+- Identify the EXACT step in the student's answer where the error occurred.
+- Explain specifically WHY that step is wrong by referencing the student's actual written work.
+- Do NOT give generic fraction rules. Address THEIR specific calculation error.
+- Example: "Kamu menulis X, tetapi seharusnya Y karena Z"
+"""
+    elif feedback_type == "Topic-Contingent":
+        feedback_type_instruction = """
+FEEDBACK TYPE INSTRUCTION (Topic-Contingent):
+- Re-teach the specific fraction concept the student is struggling with.
+- Use a SIMPLER example first, then connect it back to THIS problem.
+- Show the concept step-by-step, not just the rule.
+- DO NOT just say "try again" or repeat generic steps already given before.
+"""
+    elif feedback_type == "Try-Again":
+        feedback_type_instruction = """
+FEEDBACK TYPE INSTRUCTION (Try-Again):
+- Briefly confirm what the student did correctly first.
+- Point out which SPECIFIC step needs correction (e.g., "Langkah ke-2 perlu dicek lagi").
+- Give ONE concrete hint about what to check, based on the actual error in their answer.
+- Keep it short and encouraging.
+"""
+    elif feedback_type == "Correct Response":
+        feedback_type_instruction = """
+FEEDBACK TYPE INSTRUCTION (Correct Response):
+- The student has made 3+ errors OR answered correctly.
+- DO NOT reveal the final numeric/fraction answer.
+- Give guided step-by-step scaffolding only: what to do at Step 1, Step 2, Step 3.
+- If the student made mistakes, explicitly highlight the misconception and how to fix that step.
+- If the student is already correct, verify briefly and still provide process-focused reinforcement (without restating final result).
+- Be warm and encouraging.
+"""
 
     return f"""
-#Explain task
-Generate feedback for junior high school students who are solving fraction problems.
-Follow these instructions carefully.
+# Fraction Tutor Feedback Task
 
-[Information about current problem]
+[Current Problem]
 Problem: {problem}
-Solution: {problem_solution}
+Correct Solution: {problem_solution}
 
-[Student Information]
+[Student Profile]
 Student Prior Knowledge (SPK): {spk}
 Student Achievement Level (SAL): {sal}
-Student Current Answer (SA): {student_answer}
-Student Number of Errors: {number_of_errors}
+Number of Errors So Far: {number_of_errors}
 
-[Feedback to provide]
-Feedback Type: {feedback_type}
-{previous_feedback_section}
-[Relevant knowledge snippets]
-{relevant_text}
+[Student's Current Answer]
+{student_answer}
 
-[Answer Evaluation]
+[SPECIFIC ERROR — YOUR FEEDBACK MUST ADDRESS THIS DIRECTLY]
+{specific_error or evaluation_reasoning}
+
+[Answer Evaluation Reasoning]
 {evaluation_reasoning}
 
-You must follow these steps:
-1. Understand the problem and student information carefully.
-2. Consider the answer evaluation above when identifying misconceptions.
-3. Generate encouraging feedback in Bahasa Indonesia that matches the feedback type.
-4. Do NOT reveal the final solution directly. Give the final solution only if the feedback type is "Correct Response".
-5. Return the feedback in valid JSON with keys "Feedback Type" and "Feedback".
-6. CRITICAL: ALL mathematical expressions MUST be wrapped in LaTeX delimiters. Use $...$ for inline math. For example: $\frac{{1}}{{2}}$, $\times$, $\div$, $3\frac{{1}}{{4}}$. NEVER write bare LaTeX commands like \frac or \times without $ delimiters.
-7. Adopt the tone of a supportive peer tutor use more indonesian junior high school-friendly language.
-8. If previous feedback is provided, make sure your feedback is DIFFERENT and provides NEW value.
-9. Keep the feedback concise and focused not redundant. Take a look on student previous answer and feedbacks to avoid repetition.
+{feedback_type_instruction}
 
-Description about feedback:
-Response-contingent is detailed comments that highlight the learner's particular response. It might explain why the right response is right and the incorrect one is incorrect. No formal error analysis is used here.
-Topic-contingent is detailed feedback that gives the student details about the subject they are currently studying. This could just
-mean reteaching the content.
-Correct response is informs the student of the correct answer to the problem solved with no additional information.
-Verification informs the students about the correctness of their response(s), such as right/wrong or overall percentage correct.
-Try-again informs the student if they made an incorrect response and allows the student one or more attempts to answer the questions.
+{previous_feedback_section}
+
+[Relevant Knowledge Base Snippets]
+{relevant_text}
+
+[STRICT INSTRUCTIONS]
+1. Your feedback MUST directly quote the SPECIFIC ERROR above — state exactly what the student wrote wrong and explain WHY it is wrong.
+2. Do NOT give generic fraction rules. Address ONLY the specific mistake visible in the student's answer.
+3. Do NOT repeat anything already said in previous feedbacks.
+4. Write in friendly Bahasa Indonesia suitable for junior high school students.
+5. NEVER reveal or restate the final numeric/fraction answer in any feedback type.
+    - Use guided hints and step-by-step process scaffolding instead.
+    - Prefer prompts like: "Coba hitung penyebut samanya dulu", "Periksa lagi operasi di langkah ke-2".
+6. Write ALL math using inline LaTeX WITH dollar delimiters already included, e.g. $\\frac{{1}}{{2}}$, $\\times$, $\\div$, $3\\frac{{1}}{{2}}$. Always include the $ signs yourself. Use a single backslash for each command — the JSON encoder handles escaping.
+7. Keep feedback concise (3-5 sentences max), focused, and actionable.
+9. Do not give final answers, but do give specific hints that directly address the student's actual written error. Only give final solutions if it is correct or they have made 3+ errors, and even then do NOT restate the final answer — only give process-based feedback.
+8. Return ONLY valid JSON with exactly these keys:
+   {{"Feedback Type": "{feedback_type}", "Feedback": "your feedback here"}}
 
 """.strip()
 
 
-def _call_chat_model(messages: Sequence[Dict[str, str]], llm_model: str) -> str:
+def _call_chat_model(messages: Sequence[Dict[str, str]], llm_model: str, use_json_format: bool = False) -> str:
     """Call the chat model to generate feedback."""
     client = _get_openai_client()
     if _OPENAI_USES_CLIENT:
-        response = client.chat.completions.create(
+        kwargs: dict = dict(
             model=llm_model,
             messages=list(messages),
             max_tokens=800,
             temperature=0.2,
         )
+        if use_json_format:
+            kwargs["response_format"] = {"type": "json_object"}
+        response = client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
 
     import openai  # type: ignore
@@ -160,32 +201,61 @@ def _call_chat_model(messages: Sequence[Dict[str, str]], llm_model: str) -> str:
 
 
 def _extract_feedback(raw_response: str, fallback_type: str) -> Dict[str, str]:
-    """Parse JSON feedback, handling Markdown fences and fallbacks."""
+    """Parse JSON feedback with LaTeX sanitization and a regex fallback."""
     cleaned = raw_response.strip()
+
+    # Strip markdown code fences (```json ... ``` or ``` ... ```)
     if cleaned.startswith("```"):
-        parts = cleaned.strip("`").split("\n", 1)
-        if len(parts) == 2:
-            _, cleaned = parts
-        cleaned = cleaned.strip()
-        if cleaned.startswith("json"):
-            cleaned = cleaned[4:].strip()
+        cleaned = re.sub(r'^```[a-z]*\n?', '', cleaned)
+        cleaned = re.sub(r'\n?```\s*$', '', cleaned).strip()
+
+    # Pre-process: escape bare LaTeX backslash commands that are INVALID JSON escapes.
+    # Valid single-char JSON escapes: " \ / b f n r t u
+    # Commands like \div, \cdot, \sqrt, \pm, \leq cause JSONDecodeError — fix them.
+    # Note: \frac (\f) and \times (\t) ARE valid JSON escapes but corrupt silently — fixed post-parse.
+    cleaned = re.sub(r'\\(?!["\\\/ bfnrtu]|u[0-9a-fA-F]{4})', r'\\\\', cleaned)
 
     try:
         payload = json.loads(cleaned)
         if isinstance(payload, dict):
             feedback_type = str(payload.get("Feedback Type", fallback_type)).strip()
-            feedback_text = str(payload.get("Feedback", raw_response)).strip()
+            feedback_text = str(payload.get("Feedback", "")).strip()
+
+            # Post-process: fix LaTeX silently corrupted by JSON escape parsing.
+            # JSON \f (form feed, chr 12) appears where \frac was written without doubling.
+            # JSON \t (tab, chr 9) appears where \times/\text was written without doubling.
+            feedback_text = feedback_text.replace('\x0c', '\\f')   # form-feed → \f  (gives \frac, etc.)
+            feedback_text = feedback_text.replace('\x09imes', '\\times')  # tab+imes → \times
+            feedback_text = feedback_text.replace('\x09ext', '\\text')    # tab+ext  → \text
+
+            # Normalize over-escaped backslashes: \\frac → \frac etc.
+            # Happens when LLM outputs 4 backslashes in JSON (2 after parsing) instead of 2 (1 after parsing).
+            for _cmd in ('frac', 'times', 'div', 'pm', 'cdot', 'sqrt', 'left', 'right', 'text', 'leq', 'geq', 'neq'):
+                feedback_text = feedback_text.replace('\\\\' + _cmd, '\\' + _cmd)
+
             return {
                 "feedback_type": feedback_type or fallback_type,
-                "feedback": feedback_text or raw_response,
+                "feedback": feedback_text if feedback_text else raw_response.strip(),
                 "raw": raw_response,
             }
     except json.JSONDecodeError:
         pass
 
+    # Regex fallback: extract Feedback value even from malformed JSON
+    match = re.search(r'"Feedback"\s*:\s*"((?:[^"\\]|\\.)*)"', raw_response)
+    if match:
+        return {
+            "feedback_type": fallback_type,
+            "feedback": match.group(1).replace('\\"', '"'),
+            "raw": raw_response,
+        }
+
+    # Last resort: strip obvious JSON wrapper so plain text shows instead of raw JSON
+    stripped = re.sub(r'^\{.*?"Feedback"\s*:\s*"', '', raw_response, flags=re.DOTALL)
+    stripped = re.sub(r'".*\}\s*$', '', stripped, flags=re.DOTALL).strip()
     return {
         "feedback_type": fallback_type,
-        "feedback": raw_response.strip(),
+        "feedback": stripped if stripped else raw_response.strip(),
         "raw": raw_response,
     }
 
@@ -264,25 +334,37 @@ def generate_tutor_feedback(
     
     # Build the prompt with all information including previous feedbacks
     prompt = _build_prompt(
-        current_problem, 
-        problem_solution, 
-        student_profile, 
-        feedback_type, 
-        relevant_text, 
-        student_current_answer, 
+        current_problem,
+        problem_solution,
+        student_profile,
+        feedback_type,
+        relevant_text,
+        student_current_answer,
         number_of_errors=st.session_state.error_count,
         evaluation_reasoning=evaluation["reasoning"],
+        specific_error=evaluation.get("specific_error", ""),
         previous_feedbacks=previous_feedbacks
     )
     print(prompt)
 
     # Generate feedback using LLM
     messages = [
-        {"role": "system", "content": "You are an expert fraction tutor."},
+        {
+            "role": "system",
+            "content": (
+                "You are an expert fraction tutor for Indonesian junior high school students. "
+                "You ALWAYS give SPECIFIC feedback that directly quotes the student's exact error. "
+                "NEVER give generic advice — always reference what the student actually wrote. "
+                "NEVER reveal or restate the final answer/result, even for Correct Response; "
+                "give process-based step-by-step scaffolding and targeted hints instead. "
+                "For ALL math expressions, you MUST include the dollar-sign delimiters yourself, "
+                "e.g. write $\\frac{1}{2}$ not just \\frac{1}{2}. Use a single backslash for LaTeX commands."
+            ),
+        },
         {"role": "user", "content": prompt},
     ]
 
-    raw_response = _call_chat_model(messages, llm_model)
+    raw_response = _call_chat_model(messages, llm_model, use_json_format=True)
     feedback_payload = _extract_feedback(raw_response, feedback_type)
 
     return {

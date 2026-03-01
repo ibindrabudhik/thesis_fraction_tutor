@@ -12,7 +12,22 @@ import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
+import numpy as np
+
 from database.supabase_client import get_supabase_client, SupabaseError
+
+
+class _SafeEncoder(json.JSONEncoder):
+    """JSON encoder that handles numpy scalars and arrays."""
+
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 
 def save_message(
@@ -46,7 +61,7 @@ def save_message(
             "student_id": student_id,
             "role": role,
             "content": content,
-            "contexts": json.dumps(contexts) if contexts else None,
+            "contexts": json.dumps(contexts, cls=_SafeEncoder) if contexts else None,
         }
         
         # Add timestamp if provided (client time)

@@ -63,26 +63,26 @@ def evaluate_student_answer(
     Returns correctness assessment and reasoning.
     """
     evaluation_prompt = f"""
-You are a math teacher evaluating a student's answer to an fraction problem.
+You are a math teacher evaluating a student's answer to a fraction problem.
 
 Problem: {problem}
 Correct Solution: {correct_solution}
 Student Answer: {student_answer}
 
-Evaluate if the student's answer is mathematically correct and equivalent to the solution.
-Consider:
-1. Mathematical equivalence (e.g., "x=5" equals "5=x")
-2. Simplified vs unsimplified forms (e.g., "2x+4" equals "2(x+2)")
-3. Format differences (spaces, notation)
-4. Partial correctness or work shown
+IMPORTANT RULES:
+- Students are NOT required to show their work or steps. A correct final answer alone (e.g. "7 1/2", "15/2", "3.5") is fully acceptable.
+- Accept any mathematically equivalent form: mixed numbers, improper fractions, simplified or unsimplified.
+- Only mark as incorrect if the numerical value is WRONG, not because steps are missing.
 
-Respond in JSON format:
+Carefully check if the student's answer equals the correct solution.
+Respond ONLY in JSON format:
 {{
-    "is_correct": true/false,
+    "is_correct": true or false,
     "confidence": 0.0-1.0,
-    "reasoning": "Brief explanation of why it's correct/incorrect",
-    "has_method_error": true/false,
-    "has_calculation_error": true/false
+    "reasoning": "(1) what value the student gave, (2) what the correct value is, (3) whether they match",
+    "specific_error": "If wrong: quote exactly what the student wrote and explain what is mathematically incorrect. If correct: leave empty.",
+    "has_method_error": true if student used a wrong procedure (ignore missing steps),
+    "has_calculation_error": true if the arithmetic result is wrong
 }}
 """.strip()
 
@@ -98,7 +98,7 @@ Respond in JSON format:
                 model="gpt-4o-mini",  # Cheaper and faster for evaluation
                 messages=messages,
                 temperature=0,
-                max_tokens=300,
+                max_tokens=500,
                 response_format={"type": "json_object"}
             )
             raw = response.choices[0].message.content or "{}"
@@ -117,6 +117,7 @@ Respond in JSON format:
             "is_correct": result.get("is_correct", False),
             "confidence": result.get("confidence", 0.0),
             "reasoning": result.get("reasoning", ""),
+            "specific_error": result.get("specific_error", ""),
             "has_method_error": result.get("has_method_error", False),
             "has_calculation_error": result.get("has_calculation_error", False),
         }
@@ -126,6 +127,7 @@ Respond in JSON format:
             "is_correct": False,
             "confidence": 0.0,
             "reasoning": f"Failed to evaluate: {str(e)}",
+            "specific_error": "",
             "has_method_error": False,
             "has_calculation_error": False,
         }

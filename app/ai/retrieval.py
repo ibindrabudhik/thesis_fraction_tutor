@@ -137,20 +137,26 @@ def retrieve_context(query: str, top_k: int = 5, use_cache: bool = True) -> List
             print(f"Cache hit for query (top_k={top_k})")
             return _query_cache[cache_key]
     
-    retriever = get_retriever(top_k=top_k, score_threshold=0.3)
+    vector_store = load_vector_store()
     
-    # Retrieve relevant documents
-    docs = retriever.invoke(query)
+    # Use similarity_search_with_relevance_scores to get actual cosine-based scores
+    results = vector_store.similarity_search_with_relevance_scores(query, k=top_k)
     
-    # Convert to the expected format
-    print(f"Retrieved {len(docs)} documents for query")
-    contexts = [
-        {
-            "text": doc.page_content,
-            "score": doc.metadata.get("score", 0.5),
-        }
-        for doc in docs
-    ]
+    # Filter by score threshold and convert to expected format.
+    # Explicitly cast score to native Python float so downstream json.dumps
+    # (chat_service / Supabase) never chokes on numpy.float64.
+    score_threshold = 0.3
+    contexts = []
+    for doc, raw_score in results:
+        score = float(raw_score)
+        if score >= score_threshold:
+            contexts.append({"text": doc.page_content, "score": score})
+    
+    if contexts:
+        scores_str = ", ".join(f"{c['score']:.3f}" for c in contexts)
+        print(f"Retrieved {len(contexts)} documents (scores: {scores_str}) from {len(results)} candidates")
+    else:
+        print(f"No documents passed threshold ({score_threshold}) out of {len(results)} candidates")
     
     # Cache the results
     if use_cache and len(_query_cache) < _MAX_CACHE_SIZE:
@@ -188,6 +194,11 @@ def explain_contexts(contexts: Sequence[Dict[str, object]]) -> List[str]:
     for idx, ctx in enumerate(contexts, start=1):
         text = str(ctx.get("text", "")).strip()
         score = ctx.get("score")
-        score_str = f" (skor: {score:.3f})" if isinstance(score, float) else ""
+        # Accept any numeric type (float, int, numpy scalar) — scores
+        # may arrive as native float from retrieval or from json.loads.
+        try:
+            score_str = f" (skor: {float(score):.3f})" if score is not None else ""
+        except (TypeError, ValueError):
+            score_str = ""
         formatted.append(f"Sumber {idx}{score_str}:\n{text}")
     return formatted
