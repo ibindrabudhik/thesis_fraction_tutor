@@ -51,9 +51,9 @@ def get_pages_main():
             st.Page("pages/History.py", title="Riwayat Belajar", icon="📚"),
             st.Page("pages/Session_Detail.py", title="Detail Sesi", icon="📖")
         ],
-        "Sumber Pembelajaran": [
-            st.Page("pages/Resources.py", title="Sumber Belajar", icon="📖")
-        ]
+        # "Sumber Pembelajaran": [
+        #     st.Page("pages/Resources.py", title="Sumber Belajar", icon="📖")
+        # ]
     }
     return pages
 
