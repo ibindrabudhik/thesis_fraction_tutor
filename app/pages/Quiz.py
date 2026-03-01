@@ -1,7 +1,10 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import sys
 import os
+
+# GMT+8 timezone (WIB - Waktu Indonesia Barat)
+GMT8 = timezone(timedelta(hours=8))
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -17,13 +20,13 @@ if not is_authenticated():
 
 # Quiz schedule - hardcoded dates for each section
 QUIZ_SCHEDULE = {
-    # "pre_test": datetime(2026, 2, 20, 0, 0),  # Available from Feb 20, 2026
-    "ordering_fractions": datetime(2026, 3, 5, 0, 0),  # Feb 21
-    "fraction_addition": datetime(2026, 3, 5, 0, 0),  # Feb 22
-    "fraction_subtraction": datetime(2026, 3, 5, 0, 0),  # Feb 23
-    "fraction_multiplication": datetime(2026, 3, 5, 0, 0),  # Feb 24
-    # "fraction_division": datetime(2026, 2, 25, 0, 0),  # Feb 25
-    # # "post_test": datetime(2026, 2, 26, 0, 0)  # Feb 26
+    # "pre_test": datetime(2026, 2, 20, 0, 0, tzinfo=GMT8),  # Available from Feb 20, 2026
+    "ordering_fractions": datetime(2026, 3, 5, 0, 0, tzinfo=GMT8),  # Feb 21
+    "fraction_addition": datetime(2026, 3, 5, 0, 0, tzinfo=GMT8),  # Feb 22
+    "fraction_subtraction": datetime(2026, 3, 5, 0, 0, tzinfo=GMT8),  # Feb 23
+    "fraction_multiplication": datetime(2026, 3, 5, 0, 0, tzinfo=GMT8),  # Feb 24
+    # "fraction_division": datetime(2026, 2, 25, 0, 0, tzinfo=GMT8),  # Feb 25
+    # # "post_test": datetime(2026, 2, 26, 0, 0, tzinfo=GMT8)  # Feb 26
 }
 
 # Section metadata
@@ -80,8 +83,8 @@ if "completed_sections" not in st.session_state:
 
 
 def is_section_unlocked(section_key: str) -> bool:
-    """Check if a section is unlocked based on current datetime."""
-    now = datetime.now()
+    """Check if a section is unlocked based on current datetime (GMT+8)."""
+    now = datetime.now(GMT8)
     return now >= QUIZ_SCHEDULE[section_key]
 
 
@@ -91,8 +94,8 @@ def get_unlocked_sections() -> list:
 
 
 def get_time_until_unlock(section_key: str) -> str:
-    """Get formatted time remaining until section unlocks."""
-    now = datetime.now()
+    """Get formatted time remaining until section unlocks (GMT+8)."""
+    now = datetime.now(GMT8)
     unlock_time = QUIZ_SCHEDULE[section_key]
     
     if now >= unlock_time:

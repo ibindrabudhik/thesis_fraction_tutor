@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import uuid
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# GMT+8 timezone (WIB - Waktu Indonesia Barat)
+GMT8 = timezone(timedelta(hours=8))
 
 from database.supabase_client import get_supabase_client, SupabaseError
 
@@ -53,7 +56,7 @@ def log_quiz_submission(
             "correct_answer": correct_answer,
             "is_correct": is_correct,
             "knowledge_areas": knowledge_areas or [],
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(GMT8).isoformat()
         }
         print(f"[DEBUG] Attempting to insert quiz result: {data}")  # Debug log
         response = client.table("quiz_results").insert(data).execute()

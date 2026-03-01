@@ -2,8 +2,11 @@ import streamlit as st
 import sys
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import random
+
+# GMT+8 timezone (WIB - Waktu Indonesia Barat)
+GMT8 = timezone(timedelta(hours=8))
 
 # Add parent directory to path to import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -103,36 +106,36 @@ require_authentication()
 # Define when each knowledge area is accessible
 KNOWLEDGE_AREA_SCHEDULE = {
     "ordering": {
-        "start": datetime(2026, 3, 1, 23, 0),
-        "end": datetime(2026, 3, 15, 23, 59),
+        "start": datetime(2026, 3, 1, 23, 0, tzinfo=GMT8),
+        "end": datetime(2026, 3, 15, 23, 59, tzinfo=GMT8),
         "label": "Mengurutkan Pecahan"
     },
     "addition": {
-        "start": datetime(2026, 3, 1, 23, 0),
-        "end": datetime(2026, 3, 15, 23, 59),
+        "start": datetime(2026, 3, 1, 23, 0, tzinfo=GMT8),
+        "end": datetime(2026, 3, 15, 23, 59, tzinfo=GMT8),
         "label": "Penjumlahan Pecahan"
     },
     "subtraction": {
-        "start": datetime(2026, 3, 1, 23, 0),
-        "end": datetime(2026, 3, 15, 23, 59),
+        "start": datetime(2026, 3, 1, 23, 0, tzinfo=GMT8),
+        "end": datetime(2026, 3, 15, 23, 59, tzinfo=GMT8),
         "label": "Pengurangan Pecahan"
     },
     "multiplication": {
-        "start": datetime(2026, 3, 4, 23, 0),
-        "end": datetime(2026, 3, 15, 23, 59),
+        "start": datetime(2026, 3, 4, 23, 0, tzinfo=GMT8),
+        "end": datetime(2026, 3, 15, 23, 59, tzinfo=GMT8),
         "label": "Perkalian Pecahan"
     },
     "division": {
-        "start": datetime(2026, 3, 8, 23, 0),
-        "end": datetime(2026, 3, 15, 23, 59),
+        "start": datetime(2026, 3, 8, 23, 0, tzinfo=GMT8),
+        "end": datetime(2026, 3, 15, 23, 59, tzinfo=GMT8),
         "label": "Pembagian Pecahan"
     }
 }
 
 
 def get_active_knowledge_areas() -> list:
-    """Get currently active knowledge areas based on current datetime."""
-    now = datetime.now()
+    """Get currently active knowledge areas based on current datetime (GMT+8)."""
+    now = datetime.now(GMT8)
     active_areas = []
     
     for area, schedule in KNOWLEDGE_AREA_SCHEDULE.items():
@@ -510,7 +513,7 @@ with col2:
                 
                 student_id = get_student_id()
                 session_id = st.session_state.current_session_id
-                client_time = datetime.now()
+                client_time = datetime.now(GMT8)
                 
                 if input_type == "question":
                     # Handle as clarification question (no evaluation, no error counting)

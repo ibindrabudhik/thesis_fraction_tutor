@@ -1,6 +1,9 @@
 import streamlit as st
 import datetime
 
+# GMT+8 timezone (WIB - Waktu Indonesia Barat)
+GMT8 = datetime.timezone(datetime.timedelta(hours=8))
+
 # ---------- CONFIG ----------
 # Translate tanggal ke bahasa Indonesia
 days_id = {
@@ -14,8 +17,8 @@ months_id = {
     "September": "September", "October": "Oktober", "November": "November", "December": "Desember"
 }
 
-# Get current time
-now = datetime.datetime.now()
+# Get current time in GMT+8
+now = datetime.datetime.now(GMT8)
 
 # Translate
 english_day = now.strftime("%A")
