@@ -93,41 +93,77 @@ Attempt {i}:
 """
         previous_feedback_section += "\nCRITICAL: The student has already received the above feedback and STILL made an error. You MUST approach the explanation from a completely different angle.\n"
 
+    # Normalize feedback type for matching (handles variants from choose_feedback_type)
+    ft_lower = feedback_type.lower()
+
     # Build feedback type specific instruction
     feedback_type_instruction = ""
-    if feedback_type == "Response-Contingent":
+    if feedback_type == "Correct Response":
+        feedback_type_instruction = """
+FEEDBACK TYPE INSTRUCTION (Correct Response — full guided solution):
+This feedback is given because the student answered correctly OR has reached 3+ errors and needs the full solution walkthrough.
+
+IF THE STUDENT ANSWERED CORRECTLY:
+- Congratulate the student warmly.
+- Briefly confirm WHY their answer is correct by walking through the key steps.
+- Reinforce the concept so they remember the method.
+
+IF THE STUDENT HAS 3+ ERRORS (still wrong):
+- Be warm and encouraging — do NOT scold or shame.
+- Clearly show the COMPLETE step-by-step solution from start to finish.
+- At each step, explain WHAT you are doing and WHY.
+- Point out where the student's approach went wrong and how the correct step differs.
+- You MUST walk through every step until arriving at the final answer.
+- It is OK to state the final answer in this feedback type.
+
+Format the solution clearly with numbered steps, e.g.:
+Langkah 1: ...
+Langkah 2: ...
+Langkah 3: ...
+Jadi, jawabannya adalah ...
+"""
+    elif "response" in ft_lower and "contingent" in ft_lower:
         feedback_type_instruction = """
 FEEDBACK TYPE INSTRUCTION (Response-Contingent):
 - Identify the EXACT step in the student's answer where the error occurred.
 - Explain specifically WHY that step is wrong by referencing the student's actual written work.
 - Do NOT give generic fraction rules. Address THEIR specific calculation error.
+- NEVER reveal or hint at the final answer. Only address the wrong step.
 - Example: "Kamu menulis X, tetapi seharusnya Y karena Z"
 """
-    elif feedback_type == "Topic-Contingent":
+    elif "topic" in ft_lower and "contingent" in ft_lower:
         feedback_type_instruction = """
 FEEDBACK TYPE INSTRUCTION (Topic-Contingent):
 - Re-teach the specific fraction concept the student is struggling with.
-- Use a SIMPLER example first, then connect it back to THIS problem.
+- Use a SIMPLER example first (different numbers), then connect it back to THIS problem.
 - Show the concept step-by-step, not just the rule.
+- NEVER reveal or hint at the final answer of the current problem.
 - DO NOT just say "try again" or repeat generic steps already given before.
 """
-    elif feedback_type == "Try-Again":
+    elif "try again" in ft_lower or "try-again" in ft_lower:
         feedback_type_instruction = """
 FEEDBACK TYPE INSTRUCTION (Try-Again):
 - Briefly confirm what the student did correctly first.
 - Point out which SPECIFIC step needs correction (e.g., "Langkah ke-2 perlu dicek lagi").
 - Give ONE concrete hint about what to check, based on the actual error in their answer.
+- NEVER reveal or hint at the final answer.
 - Keep it short and encouraging.
 """
-    elif feedback_type == "Correct Response":
+    elif "verification" in ft_lower:
         feedback_type_instruction = """
-FEEDBACK TYPE INSTRUCTION (Correct Response):
-- The student has made 3+ errors OR answered correctly.
-- DO NOT reveal the final numeric/fraction answer.
-- Give guided step-by-step scaffolding only: what to do at Step 1, Step 2, Step 3.
-- If the student made mistakes, explicitly highlight the misconception and how to fix that step.
-- If the student is already correct, verify briefly and still provide process-focused reinforcement (without restating final result).
-- Be warm and encouraging.
+FEEDBACK TYPE INSTRUCTION (Verification + Response-Contingent):
+- First, briefly tell the student that their answer is incorrect.
+- Then identify the EXACT step where their error occurred.
+- Explain specifically WHY that step is wrong.
+- NEVER reveal or hint at the final answer.
+"""
+    else:
+        # Standard / unknown feedback type
+        feedback_type_instruction = f"""
+FEEDBACK TYPE INSTRUCTION ({feedback_type}):
+- Provide helpful feedback that addresses the student's specific error.
+- Do NOT give generic advice — reference what the student actually wrote.
+- NEVER reveal or hint at the final answer.
 """
 
     return f"""
@@ -145,6 +181,8 @@ Number of Errors So Far: {number_of_errors}
 [Student's Current Answer]
 {student_answer}
 
+NOTE: Students type mixed fractions with a space, e.g. "1 1/3" means $1\frac{{1}}{{3}}$, "3 4/9" means $3\frac{{4}}{{9}}$. Always interpret "<integer> <fraction>" as a mixed number.
+
 [SPECIFIC ERROR — YOUR FEEDBACK MUST ADDRESS THIS DIRECTLY]
 {specific_error or evaluation_reasoning}
 
@@ -159,16 +197,15 @@ Number of Errors So Far: {number_of_errors}
 {relevant_text}
 
 [STRICT INSTRUCTIONS]
-1. Your feedback MUST directly quote the SPECIFIC ERROR above — state exactly what the student wrote wrong and explain WHY it is wrong.
+1. Your feedback MUST directly reference the student's actual answer — state what they wrote and address it specifically.
 2. Do NOT give generic fraction rules. Address ONLY the specific mistake visible in the student's answer.
 3. Do NOT repeat anything already said in previous feedbacks.
 4. Write in friendly Bahasa Indonesia suitable for junior high school students.
-5. NEVER reveal or restate the final numeric/fraction answer in any feedback type.
-    - Use guided hints and step-by-step process scaffolding instead.
-    - Prefer prompts like: "Coba hitung penyebut samanya dulu", "Periksa lagi operasi di langkah ke-2".
+5. SOLUTION REVEAL RULES (VERY IMPORTANT):
+   - If Feedback Type is "Correct Response": You MUST walk through the complete step-by-step solution and you MAY state the final answer.
+   - For ALL OTHER Feedback Types: NEVER reveal, hint at, or restate the final numeric/fraction answer. Use guided hints only, e.g.: "Coba hitung penyebut samanya dulu", "Periksa lagi operasi di langkah ke-2".
 6. Write ALL math using inline LaTeX WITH dollar delimiters already included, e.g. $\\frac{{1}}{{2}}$, $\\times$, $\\div$, $3\\frac{{1}}{{2}}$. Always include the $ signs yourself. Use a single backslash for each command — the JSON encoder handles escaping.
-7. Keep feedback concise (3-5 sentences max), focused, and actionable.
-9. Do not give final answers, but do give specific hints that directly address the student's actual written error. Only give final solutions if it is correct or they have made 3+ errors, and even then do NOT restate the final answer — only give process-based feedback.
+7. For "Correct Response": be thorough — show every step. For other types: keep feedback concise (3-5 sentences max), focused, and actionable.
 8. Return ONLY valid JSON with exactly these keys:
    {{"Feedback Type": "{feedback_type}", "Feedback": "your feedback here"}}
 
@@ -269,6 +306,7 @@ def generate_tutor_feedback(
     top_k: int = 3,
     llm_model: str = LLM_MODEL_NAME,
     previous_feedbacks: list = None,
+    error_count: int = 0,
 ) -> Dict[str, object]:
     """
     Main entry point to generate feedback for a student's answer.
@@ -281,6 +319,7 @@ def generate_tutor_feedback(
         top_k: Number of context chunks to retrieve
         llm_model: LLM model to use for feedback generation
         previous_feedbacks: List of previous feedback dicts to avoid repetition
+        error_count: Current cumulative error count for this session (before this attempt)
         
     Returns:
         Dict containing feedback, contexts, evaluation, and metadata
@@ -306,14 +345,12 @@ def generate_tutor_feedback(
     print(f"Evaluation: is_correct={is_correct}, confidence={confidence:.2f}")
     print(f"Reasoning: {evaluation['reasoning']}")
 
-    # Adjust error counting based on correctness
-    if not is_correct:
-        st.session_state.error_count += 1
-    else:
-        st.session_state.error_count = 0  # Reset on correct answer
+    # Calculate what the error count will be AFTER this attempt
+    # (caller is responsible for actually updating session state)
+    effective_error_count = error_count + 1 if not is_correct else error_count
 
-    # Use original feedback type decision logic
-    if st.session_state.error_count >= 3:
+    # Decide feedback type based on effective error count
+    if effective_error_count >= 3:
         feedback_type = "Correct Response"
     elif is_correct:
         feedback_type = "Correct Response"
@@ -340,7 +377,7 @@ def generate_tutor_feedback(
         feedback_type,
         relevant_text,
         student_current_answer,
-        number_of_errors=st.session_state.error_count,
+        number_of_errors=effective_error_count,
         evaluation_reasoning=evaluation["reasoning"],
         specific_error=evaluation.get("specific_error", ""),
         previous_feedbacks=previous_feedbacks
@@ -353,10 +390,12 @@ def generate_tutor_feedback(
             "role": "system",
             "content": (
                 "You are an expert fraction tutor for Indonesian junior high school students. "
-                "You ALWAYS give SPECIFIC feedback that directly quotes the student's exact error. "
+                "You ALWAYS give SPECIFIC feedback that directly references the student's actual answer. "
                 "NEVER give generic advice — always reference what the student actually wrote. "
-                "NEVER reveal or restate the final answer/result, even for Correct Response; "
-                "give process-based step-by-step scaffolding and targeted hints instead. "
+                "For the 'Correct Response' feedback type: you MUST provide a complete step-by-step "
+                "solution walkthrough including the final answer. "
+                "For ALL OTHER feedback types: NEVER reveal the final answer — give hints and "
+                "scaffolding only so the student can discover the answer themselves. "
                 "For ALL math expressions, you MUST include the dollar-sign delimiters yourself, "
                 "e.g. write $\\frac{1}{2}$ not just \\frac{1}{2}. Use a single backslash for LaTeX commands."
             ),

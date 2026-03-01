@@ -108,17 +108,55 @@ def classify_input(
     # But still use LLM for accuracy since ambiguous -> answer
     
     # Use LLM for classification
-    prompt = f"""Act as Lyra, classify the student's input as either "question" or "answer". // Bertindaklah sebagai Lyra, klasifikasikan masukan siswa sebagai "question" atau "answer".
+    prompt = f"""Classify the student's input as either "question" or "answer".
 
 Problem: {problem}
 Student Input: {user_input}
 
-Rules:
-- "question": Student is asking for help, clarification, explanation, or doesn't understand something // Kalau misalkan siswa meminta bantuan, klarifikasi, penjelasan, atau tidak mengerti sesuatu
-- "answer": Student is attempting to solve the problem or provide a mathematical answer // Kalau misalkan siswa mencoba menyelesaikan masalah atau memberikan jawaban matematika
+--- DEFINITIONS ---
 
-Respond with ONLY one word: "question" or "answer"
-If ambiguous or uncertain, respond "question"."""
+"question" — the student is:
+  • Asking for help, clarification, or explanation about a concept
+  • Checking / verifying their STEPS or approach ("apakah langkahnya begini?", "gitu bukan?", "benar ga?")
+  • Expressing confusion ("bingung", "ga ngerti", "maksudnya gimana?")
+  • Requesting an example or a simpler explanation
+  Even if the input contains math expressions, if the student is ASKING whether their approach or steps are correct, it is a "question".
+
+"answer" — the student is:
+  • Submitting a final result / solution ("jawabannya 5/6", "hasilnya 3/4", "= 7/10")
+  • Stating a definitive answer without seeking confirmation
+  • Writing only a number or fraction as their response
+
+--- EXAMPLES ---
+
+"question" examples:
+  - "kalau gitu harusnya 9 x 3 / 30 dikurangkan dengan 2 x 10 / 30 gitu?"
+  - "berarti langkah pertama cari KPK dulu ya?"
+  - "maksudnya penyebutnya disamakan dulu?"
+  - "apa bedanya pembilang dan penyebut?"
+  - "jadi caranya gimana?"
+  - "yang ini dikali silang bukan?"
+  - "kalau 1/2 + 1/3 itu penyebutnya jadi 6 ya?"
+  - "oh jadi harusnya dikali bukan ditambah?"
+
+"answer" examples:
+  - "5/6"
+  - "jawabannya 7/10"
+  - "hasilnya 3 1/2"  (this is a mixed fraction: three and a half)
+  - "1 1/3"  (mixed fraction: one and one-third)
+  - "2 5/6"  (mixed fraction: two and five-sixths)
+  - "1/2 + 1/3 = 5/6"
+  - "= 27/30 - 20/30 = 7/30"
+  - "jadi hasilnya 7/30"
+  - "3 4/9"  (mixed fraction answer)
+
+NOTE: Students write mixed fractions with a SPACE, e.g. "1 1/3" means 1⅓. When a student writes "<number> <fraction>" without any question words or question marks, treat it as a mixed fraction answer.
+
+--- KEY DISTINCTION ---
+If the student ends with a question-like tone ("gitu?", "ya?", "bukan?", "benar ga?", "?") and is describing STEPS rather than stating a final result, classify as "question".
+If uncertain, classify as "question" so the tutor can provide clarification.
+
+Respond with ONLY one word: "question" or "answer" """
 
     try:
         client = _get_openai_client()
@@ -185,29 +223,46 @@ def generate_clarification_response(
     spk = student_profile.get("spk", "Unknown")
     sal = student_profile.get("sal", "Unknown")
     
-    prompt = f"""You are Uma, a friendly fraction tutor helping a junior high school student.
-The student is asking a question about the problem below.
+    prompt = f"""You are Uma, a friendly and supportive fraction tutor for Indonesian junior high school students.
+The student is asking a question or verifying their approach to the problem below.
 
 [Problem]
 {problem}
 
-[Student Question]
+[Correct Solution — for YOUR reference only]
+{problem_solution}
+
+[Student's Question / Verification Request]
 {user_question}
 
 [Student Profile]
-- Prior Knowledge: {spk}
-- Achievement Level: {sal}
+- Prior Knowledge (SPK): {spk}
+- Achievement Level (SAL): {sal}
 
-[Relevant Knowledge]
+[Relevant Knowledge Base]
 {relevant_text}
 
-Instructions:
-1. Answer the student's question helpfully in Bahasa Indonesia
-2. Do NOT reveal the final solution or answer directly
-3. Guide the student toward understanding without giving away the answer
-4. Be encouraging and supportive like a peer tutor
-5. CRITICAL: ALL mathematical expressions MUST be wrapped in LaTeX delimiters using $...$ for inline math. For example: $\frac{1}{2}$, $\times$, $\div$, $3\frac{1}{4}$. NEVER write bare LaTeX commands like \frac or \times without $ delimiters.
-6. Keep the response concise but helpful
+--- IMPORTANT ---
+Students type mixed fractions with a SPACE, e.g. "1 1/3" means $1\frac{1}{3}$, "3 4/9" means $3\frac{4}{9}$. Always interpret "<integer> <fraction>" as a mixed number.
+
+--- INSTRUCTIONS ---
+
+1. Determine what the student is asking:
+   a) STEP VERIFICATION — the student proposes steps and asks if they are correct (e.g., "gitu?", "benar ga?", "bukan?").
+      → Compare their proposed steps against the correct solution.
+      → If their steps are CORRECT: confirm warmly ("Betul!") and encourage them to continue to the next step.
+      → If their steps have an ERROR: gently point out which specific part is wrong and give a hint toward the correct step, WITHOUT revealing the final answer.
+   b) CONCEPT CLARIFICATION — the student asks about a concept ("apa itu KPK?", "gimana caranya?").
+      → Explain the concept clearly using a simple example with different numbers from the problem.
+      → Then connect it back to the current problem without revealing the answer.
+   c) GENERAL HELP — the student is confused or stuck.
+      → Give an encouraging hint about what to try first.
+
+2. NEVER reveal the final answer/result of the problem.
+3. Write in friendly Bahasa Indonesia suitable for junior high school students.
+4. Be encouraging — praise correct thinking before correcting mistakes.
+5. CRITICAL: ALL math expressions MUST use LaTeX with $ delimiters, e.g. $\frac{{1}}{{2}}$, $\times$, $\div$, $3\frac{{1}}{{4}}$. NEVER write bare LaTeX without $ delimiters.
+6. Keep the response concise (3-5 sentences) but helpful.
 
 Generate your response:"""
 

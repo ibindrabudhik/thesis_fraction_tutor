@@ -50,7 +50,24 @@ def render_latex(text: str) -> str:
     text = re.sub(r'\$\$[^$]+?\$\$', _placeholder, text)
     text = re.sub(r'\$[^$]+?\$', _placeholder, text)
     
-    # Step 2: Wrap bare \frac{...}{...} (including with optional leading number like 3\frac{1}{2})
+    # Step 2a: Convert plain-text mixed fractions (e.g. "1 1/3") into LaTeX.
+    # Match: whole_number SPACE numerator/denominator (not already inside $ or \frac)
+    # Negative lookbehind avoids matching inside existing LaTeX.
+    text = re.sub(
+        r'(?<!\$)(?<!\\frac\{)\b(\d+)\s+(\d+)\s*/\s*(\d+)\b(?!\})',
+        r'$\1\\frac{\2}{\3}$',
+        text
+    )
+    
+    # Step 2b: Convert plain fractions (e.g. "3/4") that aren't part of a mixed number into LaTeX.
+    # Only matches standalone fractions not already wrapped in $ or preceded by a digit+space (mixed).
+    text = re.sub(
+        r'(?<!\$)(?<!\d )(?<!\d)\b(\d+)\s*/\s*(\d+)\b(?!\})',
+        r'$\\frac{\1}{\2}$',
+        text
+    )
+    
+    # Step 2c: Wrap bare \frac{...}{...} (including with optional leading number like 3\frac{1}{2})
     text = re.sub(
         r'(\d*)\\frac\{([^}]*)\}\{([^}]*)\}',
         r'$\1\\frac{\2}{\3}$',
@@ -86,27 +103,27 @@ require_authentication()
 # Define when each knowledge area is accessible
 KNOWLEDGE_AREA_SCHEDULE = {
     "ordering": {
-        "start": datetime(2026, 3, 1, 0, 0),
+        "start": datetime(2026, 3, 1, 23, 0),
         "end": datetime(2026, 3, 15, 23, 59),
         "label": "Mengurutkan Pecahan"
     },
     "addition": {
-        "start": datetime(2026, 3, 1, 0, 0),
+        "start": datetime(2026, 3, 1, 23, 0),
         "end": datetime(2026, 3, 15, 23, 59),
         "label": "Penjumlahan Pecahan"
     },
     "subtraction": {
-        "start": datetime(2026, 3, 1, 0, 0),
+        "start": datetime(2026, 3, 1, 23, 0),
         "end": datetime(2026, 3, 15, 23, 59),
         "label": "Pengurangan Pecahan"
     },
     "multiplication": {
-        "start": datetime(2026, 3, 5, 0, 0),
+        "start": datetime(2026, 3, 4, 23, 0),
         "end": datetime(2026, 3, 15, 23, 59),
         "label": "Perkalian Pecahan"
     },
     "division": {
-        "start": datetime(2026, 3, 9, 0, 0),
+        "start": datetime(2026, 3, 8, 23, 0),
         "end": datetime(2026, 3, 15, 23, 59),
         "label": "Pembagian Pecahan"
     }
@@ -343,6 +360,9 @@ st.info("""
 Kerjakan soal secara **mandiri** tanpa bantuan ChatGPT atau alat lain. Kamu akan ketahuan ketika berpindah tab/window. Tidak apa-apa membuat kesalahan - Chatbot Uma ini akan membantumu belajar dari segala bentuk kesalahan! **Tidak ada hukuman** untuk salah saat belajar bersama Uma. 📚
 """)
 
+st.info(""" ℹ️  Tips: Beri jawaban dalam bentuk **paling sederhana** dan untuk jawaban yang melibatkan operasi, tulis langkah perhitungannya. Misalnya, untuk soal `1/2 + 1/3`, jawaban yang baik adalah `1/2 + 1/3 = 3/6 + 2/6 = 5/6`, bukan hanya `5/6`. Jawaban dengan langkah perhitungan akan mendapatkan umpan balik yang lebih baik! Jawaban untuk pecahan campuran juga harus dalam bentuk campuran, misalnya `1 1/2` bukan `3/2`.
+        """)
+
 # Initialize session state
 if "student_profile" not in st.session_state:
     st.session_state.student_profile = _fetch_student_profile()
@@ -537,7 +557,8 @@ with col2:
                         student_profile, 
                         soal, 
                         solution,
-                        previous_feedbacks=previous_feedbacks
+                        previous_feedbacks=previous_feedbacks,
+                        error_count=st.session_state.error_count,
                     )
                     
                     tutor_markdown = (
@@ -552,6 +573,12 @@ with col2:
                     # Check if session should be completed
                     evaluation = feedback.get("evaluation", {})
                     is_correct = evaluation.get("is_correct", False)
+                    
+                    # Update error count HERE (single source of truth)
+                    # Only increment on wrong answers; do NOT reset on correct
+                    # so the cumulative session error count is preserved for logging.
+                    if not is_correct:
+                        st.session_state.error_count += 1
                     
                     # Determine if this is the final interaction
                     is_final = is_correct or st.session_state.error_count >= 3

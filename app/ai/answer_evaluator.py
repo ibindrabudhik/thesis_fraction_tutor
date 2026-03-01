@@ -70,9 +70,11 @@ Correct Solution: {correct_solution}
 Student Answer: {student_answer}
 
 IMPORTANT RULES:
+- Students type mixed fractions with a SPACE between the whole number and the fraction, e.g. "1 1/3" means 1⅓ (one and one-third), "3 4/9" means 3⁴⁄₉, "2 5/6" means 2⁵⁄₆. ALWAYS interpret "<integer> <numerator>/<denominator>" as a mixed fraction, NOT as separate numbers.
 - Students are NOT required to show their work or steps. A correct final answer alone (e.g. "7 1/2", "15/2", "3.5") is fully acceptable.
-- Accept any mathematically equivalent form: mixed numbers, improper fractions, simplified or unsimplified.
-- Only mark as incorrect if the numerical value is WRONG, not because steps are missing.
+- Accept any mathematically equivalent form: mixed numbers (e.g. "1 1/3"), improper fractions (e.g. "4/3"), simplified or unsimplified, decimals.
+- When comparing, convert both the student's answer and the correct solution to the same form (e.g. both to improper fractions or both to decimals) before checking equality.
+- Only mark as incorrect if the numerical value is WRONG, not because steps are missing or the form differs.
 
 Carefully check if the student's answer equals the correct solution.
 Respond ONLY in JSON format:

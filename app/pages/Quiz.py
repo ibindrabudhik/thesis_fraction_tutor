@@ -18,12 +18,12 @@ if not is_authenticated():
 # Quiz schedule - hardcoded dates for each section
 QUIZ_SCHEDULE = {
     # "pre_test": datetime(2026, 2, 20, 0, 0),  # Available from Feb 20, 2026
-    "ordering_fractions": datetime(2026, 2, 20, 0, 0),  # Feb 21
-    "fraction_addition": datetime(2026, 2, 22, 0, 0),  # Feb 22
-    "fraction_subtraction": datetime(2026, 2, 23, 0, 0),  # Feb 23
-    "fraction_multiplication": datetime(2026, 2, 24, 0, 0),  # Feb 24
-    "fraction_division": datetime(2026, 2, 25, 0, 0),  # Feb 25
-    # "post_test": datetime(2026, 2, 26, 0, 0)  # Feb 26
+    "ordering_fractions": datetime(2026, 3, 5, 0, 0),  # Feb 21
+    "fraction_addition": datetime(2026, 3, 5, 0, 0),  # Feb 22
+    "fraction_subtraction": datetime(2026, 3, 5, 0, 0),  # Feb 23
+    "fraction_multiplication": datetime(2026, 3, 5, 0, 0),  # Feb 24
+    # "fraction_division": datetime(2026, 2, 25, 0, 0),  # Feb 25
+    # # "post_test": datetime(2026, 2, 26, 0, 0)  # Feb 26
 }
 
 # Section metadata
@@ -53,11 +53,11 @@ SECTION_INFO = {
         "description": "Latihan perkalian pecahan",
         "knowledge_areas": ["multiplication"]
     },
-    "fraction_division": {
-        "title": "➗ Pembagian Pecahan",
-        "description": "Latihan pembagian pecahan",
-        "knowledge_areas": ["division"]
-    },
+    # "fraction_division": {
+    #     "title": "➗ Pembagian Pecahan",
+    #     "description": "Latihan pembagian pecahan",
+    #     "knowledge_areas": ["division"]
+    # },
     # "post_test": {
     #     "title": "✅ Post-Test",
     #     "description": "Tes akhir untuk mengukur peningkatan pengetahuan Anda",
