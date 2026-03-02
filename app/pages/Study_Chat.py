@@ -437,10 +437,10 @@ with col1:
         # Render LaTeX math expressions (Streamlit auto-renders $$ and $ delimiters)
         st.markdown(render_latex(soal))
     
-    st.subheader("Profil Siswa")
-    info_cols = st.columns(2)
-    info_cols[0].metric("SPK", student_spk)
-    info_cols[1].metric("SAL", student_sal)
+    # st.subheader("Profil Siswa")
+    # info_cols = st.columns(2)
+    # info_cols[0].metric("SPK", student_spk)
+    # info_cols[1].metric("SAL", student_sal)
     
     error_cols = st.columns(1)
     if st.session_state.error_count >= 3:
