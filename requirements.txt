@@ -8,3 +8,5 @@ langchain-openai
 numpy
 sentence-transformers
 faiss-cpu
+google-cloud-aiplatform
+google-cloud-logging
