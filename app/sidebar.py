@@ -49,7 +49,8 @@ def get_pages_main():
         ],
         "Progress": [
             st.Page("pages/History.py", title="Riwayat Belajar", icon="📚"),
-            st.Page("pages/Session_Detail.py", title="Detail Sesi", icon="📖")
+            st.Page("pages/Session_Detail.py", title="Detail Sesi", icon="📖"),
+            st.Page("pages/Leaderboard.py", title="Leaderboard", icon="🏆")
         ],
         # "Sumber Pembelajaran": [
         #     st.Page("pages/Resources.py", title="Sumber Belajar", icon="📖")

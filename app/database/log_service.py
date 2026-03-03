@@ -9,6 +9,7 @@ This module handles:
 from __future__ import annotations
 
 import uuid
+import re
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
@@ -346,4 +347,110 @@ def get_recent_session_feedback(session_id: str, limit: int = 2) -> List[Dict[st
         
     except Exception as e:
         print(f"Error fetching recent session feedback: {e}")
+        return []
+
+
+def get_session_leaderboard(min_sessions: int = 1) -> List[Dict[str, Any]]:
+    """
+    Build leaderboard ranking students by number of unique sessions.
+
+    Only students with username format YPSSTUDENT_XXX are included,
+    where XXX is exactly 3 digits.
+
+    Args:
+        min_sessions: Minimum number of unique sessions to include
+
+    Returns:
+        List of leaderboard rows sorted by total_sessions desc, total_logs desc.
+        Each row contains: rank, student_id, username, name, total_sessions,
+        total_logs, first_activity, last_activity.
+    """
+    client = get_supabase_client()
+
+    try:
+        # Pull logs needed for aggregation
+        logs_response = client.table("student_logs").select(
+            "student_id, session_id, timestamp"
+        ).execute()
+
+        if not logs_response.data:
+            return []
+
+        # Pull student identity map
+        students_response = client.table("students").select(
+            "student_id, username, name"
+        ).execute()
+
+        student_map: Dict[str, Dict[str, Any]] = {}
+        for student in students_response.data or []:
+            student_map[student.get("student_id")] = student
+
+        # Keep only usernames exactly matching YPSSTUDENT_XXX
+        username_pattern = re.compile(r"^YPSSTUDENT_\d{3}$", re.IGNORECASE)
+
+        aggregates: Dict[str, Dict[str, Any]] = {}
+        for row in logs_response.data:
+            student_id = row.get("student_id")
+            if not student_id:
+                continue
+
+            student = student_map.get(student_id)
+            username = (student or {}).get("username", "")
+
+            if not username_pattern.match(username or ""):
+                continue
+
+            if student_id not in aggregates:
+                aggregates[student_id] = {
+                    "student_id": student_id,
+                    "username": username,
+                    "name": (student or {}).get("name", "-"),
+                    "sessions": set(),
+                    "total_logs": 0,
+                    "first_activity": row.get("timestamp"),
+                    "last_activity": row.get("timestamp"),
+                }
+
+            agg = aggregates[student_id]
+            session_id = row.get("session_id")
+            if session_id:
+                agg["sessions"].add(session_id)
+            agg["total_logs"] += 1
+
+            ts = row.get("timestamp")
+            if ts:
+                if not agg["first_activity"] or ts < agg["first_activity"]:
+                    agg["first_activity"] = ts
+                if not agg["last_activity"] or ts > agg["last_activity"]:
+                    agg["last_activity"] = ts
+
+        # Build final sorted rows
+        rows: List[Dict[str, Any]] = []
+        for agg in aggregates.values():
+            total_sessions = len(agg["sessions"])
+            if total_sessions < min_sessions:
+                continue
+
+            rows.append({
+                "student_id": agg["student_id"],
+                "username": agg["username"],
+                "name": agg["name"],
+                "total_sessions": total_sessions,
+                "total_logs": agg["total_logs"],
+                "first_activity": agg["first_activity"],
+                "last_activity": agg["last_activity"],
+            })
+
+        rows.sort(
+            key=lambda r: (r["total_sessions"], r["total_logs"], r["last_activity"] or ""),
+            reverse=True,
+        )
+
+        for idx, row in enumerate(rows, start=1):
+            row["rank"] = idx
+
+        return rows
+
+    except Exception as e:
+        print(f"Error building session leaderboard: {e}")
         return []
