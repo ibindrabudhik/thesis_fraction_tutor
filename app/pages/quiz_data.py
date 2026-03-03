@@ -73,18 +73,6 @@ QUIZ_QUESTIONS = {
     
     "ordering_fractions": [
         {
-            "id": "ord_1",
-            "question": "Di antara pecahan berikut, mana yang nilainya paling besar?",
-            "options": [
-                "A. $$\\frac{1}{2}$$",
-                "B. $$\\frac{3}{4}$$",
-                "C. $$\\frac{2}{3}$$",
-                "D. $$\\frac{1}{4}$$"
-            ],
-            "correct_answer": "B",
-            "knowledge_areas": ["ordering"]
-        },
-        {
             "id": "ord_2",
             "question": "Urutan pecahan $$\\frac{1}{2}, \\frac{1}{3}, \\frac{1}{4}$$ dari yang terkecil adalah...",
             "options": [
@@ -120,33 +108,9 @@ QUIZ_QUESTIONS = {
             "correct_answer": "A",
             "knowledge_areas": ["ordering"]
         },
-        {
-            "id": "ord_5",
-            "question": "Ubahlah $$0,75$$ menjadi pecahan biasa paling sederhana...",
-            "options": [
-                "A. $$\\frac{75}{10}$$",
-                "B. $$\\frac{1}{4}$$",
-                "C. $$\\frac{3}{4}$$",
-                "D. $$\\frac{3}{5}$$"
-            ],
-            "correct_answer": "C",
-            "knowledge_areas": ["ordering"]
-        },
     ],
     
     "fraction_addition": [
-        {
-            "id": "add_1",
-            "question": "Hasil dari $$\\frac{1}{3} + \\frac{1}{6}$$ adalah...",
-            "options": [
-                "A. $$\\frac{2}{9}$$",
-                "B. $$\\frac{1}{2}$$",
-                "C. $$\\frac{3}{9}$$",
-                "D. $$\\frac{2}{6}$$"
-            ],
-            "correct_answer": "B",
-            "knowledge_areas": ["addition"]
-        },
         {
             "id": "add_2",
             "question": "Hasil dari $$\\frac{2}{5} + \\frac{1}{2}$$ adalah...",
@@ -183,33 +147,9 @@ QUIZ_QUESTIONS = {
             "correct_answer": "A",
             "knowledge_areas": ["addition"]
         },
-        {
-            "id": "add_5",
-            "question": "Hasil dari $$\\frac{2}{7} + \\frac{3}{7}$$ adalah...",
-            "options": [
-                "A. $$\\frac{5}{14}$$",
-                "B. $$\\frac{6}{7}$$",
-                "C. $$\\frac{5}{7}$$",
-                "D. $$1$$"
-            ],
-            "correct_answer": "C",
-            "knowledge_areas": ["addition"]
-        },
     ],
     
     "fraction_subtraction": [
-        {
-            "id": "sub_1",
-            "question": "Hasil dari $$\\frac{5}{6} - \\frac{1}{2}$$ adalah...",
-            "options": [
-                "A. $$\\frac{4}{4}$$",
-                "B. $$\\frac{1}{3}$$",
-                "C. $$\\frac{2}{6}$$",
-                "D. $$\\frac{4}{6}$$"
-            ],
-            "correct_answer": "B",
-            "knowledge_areas": ["subtraction"]
-        },
         {
             "id": "sub_2",
             "question": "Hasil dari $$\\frac{3}{4} - \\frac{1}{3}$$ adalah...",
@@ -246,33 +186,33 @@ QUIZ_QUESTIONS = {
             "correct_answer": "B",
             "knowledge_areas": ["subtraction"]
         },
-        {
-            "id": "sub_5",
-            "question": "Hasil dari $$\\frac{4}{5} - \\frac{1}{10}$$ adalah...",
-            "options": [
-                "A. $$\\frac{7}{10}$$",
-                "B. $$\\frac{3}{5}$$",
-                "C. $$\\frac{3}{10}$$",
-                "D. $$\\frac{5}{10}$$"
-            ],
-            "correct_answer": "A",
-            "knowledge_areas": ["subtraction"]
-        },
+        # {
+        #     "id": "sub_5",
+        #     "question": "Hasil dari $$\\frac{4}{5} - \\frac{1}{10}$$ adalah...",
+        #     "options": [
+        #         "A. $$\\frac{7}{10}$$",
+        #         "B. $$\\frac{3}{5}$$",
+        #         "C. $$\\frac{3}{10}$$",
+        #         "D. $$\\frac{5}{10}$$"
+        #     ],
+        #     "correct_answer": "A",
+        #     "knowledge_areas": ["subtraction"]
+        # },
     ],
     
     "fraction_multiplication": [
-        {
-            "id": "mul_1",
-            "question": "Hasil dari $$\\frac{2}{5} \\times \\frac{5}{6}$$ adalah...",
-            "options": [
-                "A. $$\\frac{1}{3}$$",
-                "B. $$\\frac{7}{11}$$",
-                "C. $$\\frac{10}{11}$$",
-                "D. $$\\frac{2}{6}$$"
-            ],
-            "correct_answer": "A",
-            "knowledge_areas": ["multiplication"]
-        },
+        # {
+        #     "id": "mul_1",
+        #     "question": "Hasil dari $$\\frac{2}{5} \\times \\frac{5}{6}$$ adalah...",
+        #     "options": [
+        #         "A. $$\\frac{1}{3}$$",
+        #         "B. $$\\frac{7}{11}$$",
+        #         "C. $$\\frac{10}{11}$$",
+        #         "D. $$\\frac{2}{6}$$"
+        #     ],
+        #     "correct_answer": "A",
+        #     "knowledge_areas": ["multiplication"]
+        # },
         {
             "id": "mul_2",
             "question": "Hasil dari $$\\frac{3}{4}$$ dari $$20$$ adalah...",
@@ -309,18 +249,18 @@ QUIZ_QUESTIONS = {
             "correct_answer": "B",
             "knowledge_areas": ["multiplication"]
         },
-        {
-            "id": "mul_5",
-            "question": "Hasil perkalian $$\\frac{3}{8}$$ dengan $$\\frac{2}{3}$$ adalah...",
-            "options": [
-                "A. $$\\frac{1}{4}$$",
-                "B. $$\\frac{5}{11}$$",
-                "C. $$\\frac{6}{24}$$",
-                "D. $$\\frac{1}{8}$$"
-            ],
-            "correct_answer": "A",
-            "knowledge_areas": ["multiplication"]
-        },
+        # {
+        #     "id": "mul_5",
+        #     "question": "Hasil perkalian $$\\frac{3}{8}$$ dengan $$\\frac{2}{3}$$ adalah...",
+        #     "options": [
+        #         "A. $$\\frac{1}{4}$$",
+        #         "B. $$\\frac{5}{11}$$",
+        #         "C. $$\\frac{6}{24}$$",
+        #         "D. $$\\frac{1}{8}$$"
+        #     ],
+        #     "correct_answer": "A",
+        #     "knowledge_areas": ["multiplication"]
+        # },
     ],
     
     "fraction_division": [
