@@ -156,6 +156,35 @@ def get_active_knowledge_area_label() -> str:
     return " & ".join(labels)
 
 
+def get_selected_knowledge_areas() -> list:
+    """Get selected knowledge areas (subset of currently active areas)."""
+    active_areas = get_active_knowledge_areas()
+    selected_areas = st.session_state.get("selected_knowledge_areas")
+
+    # First load: default to all active areas
+    if selected_areas is None:
+        st.session_state.selected_knowledge_areas = active_areas.copy()
+        return st.session_state.selected_knowledge_areas
+
+    # Keep only areas that are currently active
+    valid_selected = [area for area in selected_areas if area in active_areas]
+    if valid_selected != selected_areas:
+        st.session_state.selected_knowledge_areas = valid_selected
+
+    return st.session_state.selected_knowledge_areas
+
+
+def get_selected_knowledge_area_label() -> str:
+    """Get display label for currently selected knowledge area(s)."""
+    selected_areas = get_selected_knowledge_areas()
+
+    if not selected_areas:
+        return "Belum ada materi dipilih"
+
+    labels = [KNOWLEDGE_AREA_SCHEDULE[area]["label"] for area in selected_areas]
+    return " & ".join(labels)
+
+
 def get_random_task_by_knowledge_area(knowledge_areas: list, level: str = None) -> dict:
     """
     Get a random task that matches any of the given knowledge areas.
@@ -173,14 +202,9 @@ def get_random_task_by_knowledge_area(knowledge_areas: list, level: str = None) 
     client = get_supabase_client()
     
     try:
-        # Build query to filter tasks by knowledge areas
-        query = client.table("tasks").select("*")
-        
-        # Add level filter if provided
-        if level:
-            query = query.eq("level", level)
-        
-        response = query.execute()
+        # Pull all tasks first, then apply area + level preference in Python.
+        # This allows graceful fallback to the opposite level when preferred level has no match.
+        response = client.table("tasks").select("*").execute()
         
         if not response.data:
             return None
@@ -202,7 +226,23 @@ def get_random_task_by_knowledge_area(knowledge_areas: list, level: str = None) 
         if not matching_tasks:
             return None
         
-        # Return random task from matching tasks
+        # If no level preference, return from all matches
+        if not level:
+            return random.choice(matching_tasks)
+
+        preferred_level = (level or "").strip().capitalize()
+        opposite_level = "High" if preferred_level == "Low" else "Low"
+
+        preferred_tasks = [t for t in matching_tasks if (t.get("level") or "").strip().capitalize() == preferred_level]
+        if preferred_tasks:
+            return random.choice(preferred_tasks)
+
+        # Fallback: if preferred level empty, use opposite level tasks
+        opposite_tasks = [t for t in matching_tasks if (t.get("level") or "").strip().capitalize() == opposite_level]
+        if opposite_tasks:
+            return random.choice(opposite_tasks)
+
+        # Final fallback: if data has non-standard level value, still return a task
         return random.choice(matching_tasks)
         
     except Exception as e:
@@ -241,8 +281,9 @@ def _fetch_current_problem() -> dict:
     if "current_task" in st.session_state and st.session_state.current_task:
         return st.session_state.current_task
     
-    # Get currently active knowledge areas based on date
+    # Get currently active and selected knowledge areas
     active_areas = get_active_knowledge_areas()
+    selected_areas = get_selected_knowledge_areas()
     
     if not active_areas:
         # No active knowledge area at this time
@@ -253,13 +294,22 @@ def _fetch_current_problem() -> dict:
             "level": "Low",
             "locked": True
         }
+
+    if not selected_areas:
+        return {
+            "task_id": "NOT_SELECTED",
+            "text": "Pilih minimal satu materi (ordering/addition/subtraction/multiplication/division) untuk mulai mengerjakan soal.",
+            "solution": "",
+            "level": "Low",
+            "locked": True
+        }
     
     # Get student achievement level for difficulty filtering
     student_profile = st.session_state.get("student_profile", {})
     level = student_profile.get("sal", "Low")
     
     try:
-        task = get_random_task_by_knowledge_area(active_areas, level)
+        task = get_random_task_by_knowledge_area(selected_areas, level)
         
         if task:
             st.session_state.current_task = {
@@ -273,14 +323,15 @@ def _fetch_current_problem() -> dict:
                 "knowledge_area_multiplication": task.get("knowledge_area_multiplication", False),
                 "knowledge_area_division": task.get("knowledge_area_division", False),
                 "active_areas": active_areas,
+                "selected_areas": selected_areas,
                 "locked": False
             }
             return st.session_state.current_task
         else:
-            # Fallback if no tasks match the active knowledge areas
+            # Fallback if no tasks match the selected knowledge areas
             return {
                 "task_id": "DEMO-001",
-                "text": f"Tidak ada soal untuk {get_active_knowledge_area_label()}",
+                "text": f"Tidak ada soal untuk materi terpilih: {get_selected_knowledge_area_label()}",
                 "solution": "",
                 "level": level,
                 "locked": True
@@ -302,11 +353,16 @@ def _start_new_session():
     if not student_id:
         return
     
-    # Get currently active knowledge areas based on date
+    # Get currently active and selected knowledge areas
     active_areas = get_active_knowledge_areas()
+    selected_areas = get_selected_knowledge_areas()
     
     if not active_areas:
         st.error("❌ Tidak ada materi yang tersedia saat ini. Silakan cek jadwal.")
+        return
+
+    if not selected_areas:
+        st.error("❌ Pilih minimal satu materi terlebih dahulu.")
         return
     
     # Get student achievement level for difficulty filtering
@@ -314,7 +370,7 @@ def _start_new_session():
     level = student_profile.get("sal", "Low")
     
     try:
-        task = get_random_task_by_knowledge_area(active_areas, level)
+        task = get_random_task_by_knowledge_area(selected_areas, level)
         
         if task:
             st.session_state.current_task = {
@@ -328,6 +384,7 @@ def _start_new_session():
                 "knowledge_area_multiplication": task.get("knowledge_area_multiplication", False),
                 "knowledge_area_division": task.get("knowledge_area_division", False),
                 "active_areas": active_areas,
+                "selected_areas": selected_areas,
                 "locked": False
             }
             
@@ -349,7 +406,7 @@ def _start_new_session():
             st.success("✅ Soal baru dimuat!")
             st.rerun()
         else:
-            st.error(f"❌ Tidak ada soal tersedia untuk {get_active_knowledge_area_label()}.")
+            st.error(f"❌ Tidak ada soal tersedia untuk materi terpilih: {get_selected_knowledge_area_label()}.")
     except Exception as e:
         st.error(f"Error starting new session: {e}")
 
@@ -383,6 +440,8 @@ if "cheat_reset_count" not in st.session_state:
     st.session_state.cheat_reset_count = 0
 if "last_processed_reset" not in st.session_state:
     st.session_state.last_processed_reset = 0
+if "selected_knowledge_areas" not in st.session_state:
+    st.session_state.selected_knowledge_areas = get_active_knowledge_areas().copy()
 if "current_session_id" not in st.session_state:
     student_id = get_student_id()
     current_task = _fetch_current_problem()
@@ -420,6 +479,40 @@ with col1:
     # Display current active knowledge area
     active_label = get_active_knowledge_area_label()
     st.info(f"📚 Materi Aktif: **{active_label}**")
+
+    # Knowledge area selector (student chooses which material to work on)
+    st.markdown("### 🎯 Pilih Materi")
+    active_areas_now = get_active_knowledge_areas()
+    selected_areas_now = get_selected_knowledge_areas()
+
+    for area, schedule in KNOWLEDGE_AREA_SCHEDULE.items():
+        is_active = area in active_areas_now
+        st.checkbox(
+            schedule["label"],
+            value=area in selected_areas_now,
+            key=f"select_area_{area}",
+            disabled=not is_active,
+            help=None if is_active else "Materi belum aktif sesuai jadwal"
+        )
+
+    col_select_1, col_select_2 = st.columns(2)
+    if col_select_1.button("✅ Terapkan", use_container_width=True):
+        selected_from_ui = [
+            area for area in KNOWLEDGE_AREA_SCHEDULE.keys()
+            if area in active_areas_now and st.session_state.get(f"select_area_{area}", False)
+        ]
+        st.session_state.selected_knowledge_areas = selected_from_ui
+        st.session_state.current_task = None
+        _start_new_session()
+
+    if col_select_2.button("Pilih Semua", use_container_width=True):
+        st.session_state.selected_knowledge_areas = active_areas_now.copy()
+        for area in KNOWLEDGE_AREA_SCHEDULE.keys():
+            st.session_state[f"select_area_{area}"] = area in active_areas_now
+        st.session_state.current_task = None
+        _start_new_session()
+
+    st.caption(f"Materi dipilih: {get_selected_knowledge_area_label()}")
     
     soal_data = _fetch_current_problem()
     soal = soal_data.get("text", "Soal tidak ditemukan.")
