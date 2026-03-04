@@ -34,12 +34,16 @@ def render_latex(text: str) -> str:
         return text
     
     import re
+
+    # Step -1: Convert escaped newlines from model output into real line breaks.
+    # Example: "Langkah 1...\\n\\nLangkah 2..." -> multiline text.
+    text = text.replace('\\r\\n', '\n').replace('\\n', '\n')
     
     # Step 0: Normalize over-escaped backslashes (\\cmd → \cmd).
     # LLM sometimes outputs \\frac (double backslash) due to JSON escaping confusion.
     # A double backslash in the Python string (i.e. the chars \ ) won't match the LaTeX
     # patterns below, so we normalize first.
-    for _cmd in ('frac', 'times', 'div', 'pm', 'cdot', 'sqrt', 'left', 'right', 'text', 'leq', 'geq', 'neq'):
+    for _cmd in ('frac', 'times', 'div', 'pm', 'cdot', 'sqrt', 'left', 'right', 'text', 'leq', 'geq', 'neq', 'approx'):
         text = text.replace('\\\\' + _cmd, '\\' + _cmd)  # \\cmd → \cmd
     
     # Step 1: Protect already-delimited LaTeX blocks by replacing them with placeholders
@@ -83,10 +87,14 @@ def render_latex(text: str) -> str:
         (r'\\div', r'$\\div$'),
         (r'\\pm', r'$\\pm$'),
         (r'\\cdot', r'$\\cdot$'),
+        (r'\\approx', r'$\\approx$'),
         (r'\\sqrt\{([^}]*)\}', r'$\\sqrt{\1}$'),
     ]
     for pattern, replacement in bare_operators:
         text = re.sub(pattern, replacement, text)
+
+    # Handle plain-text approx written without backslash, e.g. "approx0.222".
+    text = re.sub(r'\bapprox\b', '≈', text, flags=re.IGNORECASE)
     
     # Step 4: Merge adjacent $ delimiters: "$a$ $b$" → "$a \; b$" and "$x$$y$" → "$x y$"
     text = re.sub(r'\$\s*\$', ' ', text)
