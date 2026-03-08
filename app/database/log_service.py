@@ -9,9 +9,9 @@ This module handles:
 from __future__ import annotations
 
 import uuid
-import re
 from datetime import datetime
 from typing import Optional, Dict, Any, List
+import re
 
 from database.supabase_client import get_supabase_client, SupabaseError
 
@@ -351,52 +351,67 @@ def get_recent_session_feedback(session_id: str, limit: int = 2) -> List[Dict[st
 
 
 def get_session_leaderboard(min_sessions: int = 1) -> List[Dict[str, Any]]:
-    """
-    Build leaderboard ranking students by number of unique sessions.
-
-    Only students with username format YPSSTUDENT_XXX are included,
-    where XXX is exactly 3 digits.
-
-    Args:
-        min_sessions: Minimum number of unique sessions to include
-
-    Returns:
-        List of leaderboard rows sorted by total_sessions desc, total_logs desc.
-        Each row contains: rank, student_id, username, name, total_sessions,
-        total_logs, first_activity, last_activity.
-    """
     client = get_supabase_client()
 
     try:
-        # Pull logs needed for aggregation
-        logs_response = client.table("student_logs").select(
-            "student_id, session_id, timestamp"
-        ).execute()
+        # 1) Fetch ALL logs with pagination
+        page_size = 1000
+        start = 0
+        all_logs: List[Dict[str, Any]] = []
 
-        if not logs_response.data:
+        while True:
+            resp = (
+                client.table("student_logs")
+                .select("student_id, session_id, timestamp")
+                .range(start, start + page_size - 1)
+                .execute()
+            )
+            batch = resp.data or []
+            if not batch:
+                break
+
+            all_logs.extend(batch)
+            if len(batch) < page_size:
+                break
+            start += page_size
+
+        if not all_logs:
             return []
 
-        # Pull student identity map
-        students_response = client.table("students").select(
-            "student_id, username, name"
-        ).execute()
+        # 2) Fetch ALL students with pagination
+        start = 0
+        all_students: List[Dict[str, Any]] = []
 
-        student_map: Dict[str, Dict[str, Any]] = {}
-        for student in students_response.data or []:
-            student_map[student.get("student_id")] = student
+        while True:
+            resp = (
+                client.table("students")
+                .select("student_id, username, name")
+                .range(start, start + page_size - 1)
+                .execute()
+            )
+            batch = resp.data or []
+            if not batch:
+                break
 
-        # Keep only usernames exactly matching YPSSTUDENT_XXX
+            all_students.extend(batch)
+            if len(batch) < page_size:
+                break
+            start += page_size
+
+        student_map: Dict[str, Dict[str, Any]] = {
+            s.get("student_id"): s for s in all_students
+        }
+
         username_pattern = re.compile(r"^YPSSTUDENT_\d{3}$", re.IGNORECASE)
-
         aggregates: Dict[str, Dict[str, Any]] = {}
-        for row in logs_response.data:
+
+        for row in all_logs:
             student_id = row.get("student_id")
             if not student_id:
                 continue
 
-            student = student_map.get(student_id)
-            username = (student or {}).get("username", "")
-
+            student = student_map.get(student_id, {})
+            username = student.get("username", "")
             if not username_pattern.match(username or ""):
                 continue
 
@@ -404,7 +419,7 @@ def get_session_leaderboard(min_sessions: int = 1) -> List[Dict[str, Any]]:
                 aggregates[student_id] = {
                     "student_id": student_id,
                     "username": username,
-                    "name": (student or {}).get("name", "-"),
+                    "name": student.get("name", "-"),
                     "sessions": set(),
                     "total_logs": 0,
                     "first_activity": row.get("timestamp"),
@@ -412,9 +427,8 @@ def get_session_leaderboard(min_sessions: int = 1) -> List[Dict[str, Any]]:
                 }
 
             agg = aggregates[student_id]
-            session_id = row.get("session_id")
-            if session_id:
-                agg["sessions"].add(session_id)
+            if row.get("session_id"):
+                agg["sessions"].add(row["session_id"])
             agg["total_logs"] += 1
 
             ts = row.get("timestamp")
@@ -424,13 +438,11 @@ def get_session_leaderboard(min_sessions: int = 1) -> List[Dict[str, Any]]:
                 if not agg["last_activity"] or ts > agg["last_activity"]:
                     agg["last_activity"] = ts
 
-        # Build final sorted rows
         rows: List[Dict[str, Any]] = []
         for agg in aggregates.values():
             total_sessions = len(agg["sessions"])
             if total_sessions < min_sessions:
                 continue
-
             rows.append({
                 "student_id": agg["student_id"],
                 "username": agg["username"],
@@ -446,8 +458,8 @@ def get_session_leaderboard(min_sessions: int = 1) -> List[Dict[str, Any]]:
             reverse=True,
         )
 
-        for idx, row in enumerate(rows, start=1):
-            row["rank"] = idx
+        for i, r in enumerate(rows, start=1):
+            r["rank"] = i
 
         return rows
 

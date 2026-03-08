@@ -17,14 +17,21 @@ require_authentication()
 st.title("🏆 Leaderboard Sesi Belajar")
 st.markdown("Ranking berdasarkan jumlah sesi unik yang diselesaikan")
 st.markdown("Top Students yang menyelesaikan sesi terbanyak akan dapat hadiah menarik loh! 🎁")
-# st.caption("Hanya menghitung username format YPSSTUDENT_XXX (3 digit).")
+st.caption("Hanya menghitung username format YPSSTUDENT_XXX (3 digit).")
 
-min_sessions = st.number_input("Minimum sesi", min_value=1, value=1, step=1)
+col_filter, col_refresh = st.columns([3, 1])
+with col_filter:
+    min_sessions = st.number_input("Minimum sesi", min_value=1, value=1, step=1)
+with col_refresh:
+    st.write("")
+    if st.button("🔄 Refresh", use_container_width=True):
+        st.rerun()
 
 leaderboard = get_session_leaderboard(min_sessions=min_sessions)
 
 if not leaderboard:
     st.info("Belum ada data leaderboard yang cocok.")
+    st.caption("Cek: (1) username harus format YPSSTUDENT_XXX, (2) total sesi >= minimum sesi, (3) siswa sudah mengirim jawaban sehingga masuk ke student_logs.")
     st.stop()
 
 current_student_id = get_student_id()
