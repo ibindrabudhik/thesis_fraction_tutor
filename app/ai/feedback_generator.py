@@ -28,7 +28,7 @@ from ai.answer_evaluator import evaluate_student_answer
 from ai.feedback_decision import choose_feedback_type
 from ai.retrieval import retrieve_context
 
-LLM_MODEL_NAME = "gpt-4o"
+LLM_MODEL_NAME = "gpt-5.2"
 _DEFAULT_TOF = "Immediate"
 
 
@@ -219,7 +219,7 @@ def _call_chat_model(messages: Sequence[Dict[str, str]], llm_model: str, use_jso
         kwargs: dict = dict(
             model=llm_model,
             messages=list(messages),
-            max_tokens=800,
+            max_completion_tokens=1000,
             temperature=0.2,
         )
         if use_json_format:
@@ -231,7 +231,7 @@ def _call_chat_model(messages: Sequence[Dict[str, str]], llm_model: str, use_jso
     response = client.ChatCompletion.create(
         model=llm_model,
         messages=list(messages),
-        max_tokens=800,
+        max_tokens=1000,
         temperature=0.2,
     )
     return response["choices"][0]["message"]["content"]
