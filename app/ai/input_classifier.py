@@ -22,7 +22,7 @@ except ImportError:
     _OPENAI_USES_CLIENT = False
 
 # Use fast, cheap model for classification
-CLASSIFIER_MODEL = "gpt-5.2"
+CLASSIFIER_MODEL = "gpt-5"
 
 
 class MissingAPIKeyError(RuntimeError):
@@ -63,7 +63,7 @@ def classify_input(
     """
     Classify student input as either a question or an answer attempt.
     
-    Uses GPT-5.2 with strict token limits for fast classification.
+    Uses gpt-5 with strict token limits for fast classification.
     Ambiguous inputs are classified as "answer" to leverage formative feedback.
     
     Args:
@@ -271,7 +271,7 @@ Generate your response:"""
         
         if _OPENAI_USES_CLIENT:
             response = client.chat.completions.create(
-                model="gpt-5.2",
+                model="gpt-5",
                 messages=[
                     {"role": "system", "content": "You are Uma, a supportive fraction tutor. Respond in Bahasa Indonesia."},
                     {"role": "user", "content": prompt}
@@ -282,7 +282,7 @@ Generate your response:"""
             return response.choices[0].message.content.strip()
         else:
             response = client.ChatCompletion.create(
-                model="gpt-5.2",
+                model="gpt-5",
                 messages=[
                     {"role": "system", "content": "You are Uma, a supportive fraction tutor. Respond in Bahasa Indonesia."},
                     {"role": "user", "content": prompt}

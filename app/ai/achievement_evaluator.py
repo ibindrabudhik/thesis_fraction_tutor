@@ -139,7 +139,7 @@ Be encouraging in your reasoning, focusing on what the student demonstrated rath
     try:
         if _OPENAI_USES_CLIENT:
             response = client.chat.completions.create(
-                model="gpt-5.2",  # Fast and accurate for assessment
+                model="gpt-5",  # Fast and accurate for assessment
                 messages=messages,
                 temperature=0.3,  # Low temperature for consistent assessment
                 max_completion_tokens=300,
@@ -149,7 +149,7 @@ Be encouraging in your reasoning, focusing on what the student demonstrated rath
         else:
             import openai
             response = client.ChatCompletion.create(
-                model="gpt-5.2",
+                model="gpt-5",
                 messages=messages,
                 temperature=0.3,
                 max_tokens=300,
