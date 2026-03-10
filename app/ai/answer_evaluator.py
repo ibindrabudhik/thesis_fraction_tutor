@@ -99,7 +99,6 @@ Respond ONLY in JSON format:
             response = client.chat.completions.create(
                 model="gpt-5",
                 messages=messages,
-                temperature=0,
                 response_format={"type": "json_object"}
             )
             raw = response.choices[0].message.content or "{}"
@@ -108,7 +107,6 @@ Respond ONLY in JSON format:
             response = client.ChatCompletion.create(
                 model="gpt-5",
                 messages=messages,
-                temperature=0,
             )
             raw = response["choices"][0]["message"]["content"]
 

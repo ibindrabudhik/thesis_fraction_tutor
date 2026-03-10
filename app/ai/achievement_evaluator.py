@@ -141,7 +141,6 @@ Be encouraging in your reasoning, focusing on what the student demonstrated rath
             response = client.chat.completions.create(
                 model="gpt-5",  # Fast and accurate for assessment
                 messages=messages,
-                temperature=0.3,  # Low temperature for consistent assessment
                 max_completion_tokens=300,
                 response_format={"type": "json_object"}
             )
@@ -151,7 +150,6 @@ Be encouraging in your reasoning, focusing on what the student demonstrated rath
             response = client.ChatCompletion.create(
                 model="gpt-5",
                 messages=messages,
-                temperature=0.3,
                 max_tokens=300,
             )
             raw = response["choices"][0]["message"]["content"]

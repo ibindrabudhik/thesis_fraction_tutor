@@ -168,8 +168,7 @@ Respond with ONLY one word: "question" or "answer" """
                     {"role": "system", "content": "You classify student inputs. Respond with only 'question' or 'answer'."},
                     {"role": "user", "content": prompt}
                 ],
-                max_completion_tokens=100,
-                temperature=0,
+                max_completion_tokens=10,
             )
             result = response.choices[0].message.content.strip().lower()
         else:
@@ -180,7 +179,6 @@ Respond with ONLY one word: "question" or "answer" """
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=10,
-                temperature=0,
             )
             result = response["choices"][0]["message"]["content"].strip().lower()
         
@@ -277,7 +275,6 @@ Generate your response:"""
                     {"role": "user", "content": prompt}
                 ],
                 max_completion_tokens=500,
-                temperature=0.3,
             )
             return response.choices[0].message.content.strip()
         else:
@@ -288,7 +285,6 @@ Generate your response:"""
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=500,
-                temperature=0.3,
             )
             return response["choices"][0]["message"]["content"].strip()
             
