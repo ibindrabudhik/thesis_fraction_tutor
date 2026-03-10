@@ -219,7 +219,7 @@ def _call_chat_model(messages: Sequence[Dict[str, str]], llm_model: str, use_jso
         kwargs: dict = dict(
             model=llm_model,
             messages=list(messages),
-            max_completion_tokens=1000,
+            max_completion_tokens=3000,
         )
         if use_json_format:
             kwargs["response_format"] = {"type": "json_object"}
@@ -230,7 +230,7 @@ def _call_chat_model(messages: Sequence[Dict[str, str]], llm_model: str, use_jso
     response = client.ChatCompletion.create(
         model=llm_model,
         messages=list(messages),
-        max_tokens=1000,
+        max_tokens=3000,
     )
     return response["choices"][0]["message"]["content"]
 
