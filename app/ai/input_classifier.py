@@ -22,7 +22,7 @@ except ImportError:
     _OPENAI_USES_CLIENT = False
 
 # Use fast, cheap model for classification
-CLASSIFIER_MODEL = "gpt-5"
+CLASSIFIER_MODEL = "gpt-4o-mini"
 
 
 class MissingAPIKeyError(RuntimeError):
@@ -63,7 +63,7 @@ def classify_input(
     """
     Classify student input as either a question or an answer attempt.
     
-    Uses gpt-5 with strict token limits for fast classification.
+    Uses GPT-4o-mini with strict token limits for fast classification.
     Ambiguous inputs are classified as "answer" to leverage formative feedback.
     
     Args:
@@ -168,7 +168,7 @@ Respond with ONLY one word: "question" or "answer" """
                     {"role": "system", "content": "You classify student inputs. Respond with only 'question' or 'answer'."},
                     {"role": "user", "content": prompt}
                 ],
-                max_completion_tokens=10,
+                max_tokens=10,
             )
             result = response.choices[0].message.content.strip().lower()
         else:
@@ -269,17 +269,17 @@ Generate your response:"""
         
         if _OPENAI_USES_CLIENT:
             response = client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are Uma, a supportive fraction tutor. Respond in Bahasa Indonesia."},
                     {"role": "user", "content": prompt}
                 ],
-                max_completion_tokens=500,
+                max_tokens=500,
             )
             return response.choices[0].message.content.strip()
         else:
             response = client.ChatCompletion.create(
-                model="gpt-5",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are Uma, a supportive fraction tutor. Respond in Bahasa Indonesia."},
                     {"role": "user", "content": prompt}

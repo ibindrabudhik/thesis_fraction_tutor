@@ -97,7 +97,7 @@ Respond ONLY in JSON format:
     try:
         if _OPENAI_USES_CLIENT:
             response = client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-4o-mini",
                 messages=messages,
                 response_format={"type": "json_object"}
             )
@@ -105,7 +105,7 @@ Respond ONLY in JSON format:
         else:
             import openai
             response = client.ChatCompletion.create(
-                model="gpt-5",
+                model="gpt-4o-mini",
                 messages=messages,
             )
             raw = response["choices"][0]["message"]["content"]

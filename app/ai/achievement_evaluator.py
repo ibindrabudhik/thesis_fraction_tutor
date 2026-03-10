@@ -139,16 +139,16 @@ Be encouraging in your reasoning, focusing on what the student demonstrated rath
     try:
         if _OPENAI_USES_CLIENT:
             response = client.chat.completions.create(
-                model="gpt-5",  # Fast and accurate for assessment
+                model="gpt-4o-mini",  # Fast and accurate for assessment
                 messages=messages,
-                max_completion_tokens=300,
+                max_tokens=300,
                 response_format={"type": "json_object"}
             )
             raw = response.choices[0].message.content or "{}"
         else:
             import openai
             response = client.ChatCompletion.create(
-                model="gpt-5",
+                model="gpt-4o-mini",
                 messages=messages,
                 max_tokens=300,
             )
